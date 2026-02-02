@@ -1,0 +1,27 @@
+[project]
+name = "network-agent"
+version = "0.1.0"
+description = "LangGraph agent -> MCP server -> RESTCONF -> router"
+readme = "README.md"
+requires-python = "==3.11.9"
+
+dependencies = [
+    "langchain==1.2.7",
+    "langgraph==1.0.7",
+    "pydantic==2.12.5",
+    "httpx==0.28.1",
+    "requests==2.32.5",
+    "python-dotenv==1.0.1",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
