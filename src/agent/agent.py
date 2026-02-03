@@ -1,26 +1,35 @@
 from typing import Annotated, TypedDict
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, BaseMessage, AIMessage
+from langchain_core.messages import HumanMessage, BaseMessage, AIMessage, SystemMessage
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import MemorySaver
 
 load_dotenv()
 
-PROMPT = """You are a helpful AI assistant. Answer the user's questions based on the provided context."""
+PROMPT = """You are a helpful network AI assistant. You are only to assist with network-related queries.
+If the user asks a question outside of networking, politely inform them that you can only assist with network-related topics."""
 
 class AgentState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     user_input: str
 
-llm = ChatOpenAI(model="gpt-5-mini", temperature=0, prompt=PROMPT)
+llm = ChatOpenAI(model="gpt-5-mini", temperature=0)
 
 def ingestion(state: AgentState) -> dict:
-    user_text = state.get("user_input", "")
+    user_text = state.get("user_input", "").strip()
     if not user_text:
         return {}
-    return {"messages": [HumanMessage(content=user_text)]}
+
+    new_messages: list[BaseMessage] = []
+
+    # Legg systemprompt inn én gang per session (thread_id)
+    if not state.get("messages"):
+        new_messages.append(SystemMessage(content=PROMPT))
+
+    new_messages.append(HumanMessage(content=user_text))
+    return {"messages": new_messages}
 
 def agent(state: AgentState) -> dict:
     response = llm.invoke(state["messages"])
