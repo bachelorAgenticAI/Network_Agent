@@ -5,17 +5,35 @@ from langchain_core.messages import HumanMessage, BaseMessage, AIMessage, System
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import MemorySaver
+from langchain_mcp_adapters.client import MultiServerMCPClient
+import asyncio
 
 load_dotenv()
 
-PROMPT = """You are a helpful network AI assistant. You are only to assist with network-related queries.
-If the user asks a question outside of networking, politely inform them that you can only assist with network-related topics."""
+# Initialize MultiServerMCPClient to fetch tools
+client = MultiServerMCPClient(
+    {
+        "default": {
+        }
+    }
+)
+
+# Fetch tools asynchronously from the client MCP
+async def get_tools_async():
+    return await client.get_tools()
+
+tools = asyncio.run(get_tools_async())
+
+
+PROMPT ="""
+You are a helpful network AI assistant. You are only to assist with network-related queries.
+"""
 
 class AgentState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     user_input: str
 
-llm = ChatOpenAI(model="gpt-5-mini", temperature=0)
+llm = ChatOpenAI(model="gpt-5-mini", temperature=0, tools=tools)
 
 def ingestion(state: AgentState) -> dict:
     user_text = state.get("user_input", "").strip()
@@ -31,7 +49,7 @@ def ingestion(state: AgentState) -> dict:
     new_messages.append(HumanMessage(content=user_text))
     return {"messages": new_messages}
 
-def agent(state: AgentState) -> dict:
+def agent(state: AgentState, llm=llm) -> dict:  
     response = llm.invoke(state["messages"])
     return {"messages": [response]}
 

@@ -13,6 +13,7 @@ dependencies = [
     "requests==2.32.5",
     "python-dotenv==1.0.1",
     "langchain-openai==1.1.7",
+    "langchain-mcp-adapters",
 ]
 
 [build-system]
