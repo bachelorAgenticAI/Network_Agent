@@ -1,59 +1,185 @@
 from typing import Annotated, TypedDict
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, BaseMessage, AIMessage, SystemMessage
+from langchain_core.messages import HumanMessage, BaseMessage, AIMessage, SystemMessage, ToolMessage
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.prebuilt import ToolNode, tools_condition
+from langchain_mcp_adapters.client import MultiServerMCPClient
+import asyncio
+import json
+from utils.json_logger import log_event, dump_messages
+from utils.sanitize_message import sanitize_messages
 
 load_dotenv()
 
-PROMPT = """You are a helpful network AI assistant. You are only to assist with network-related queries.
-If the user asks a question outside of networking, politely inform them that you can only assist with network-related topics."""
+PROMPT = """You are a helpful network AI assistant. 
+You get tools from a mcp server.
+You are only allowed to use these tools.
+"""
 
 class AgentState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     user_input: str
 
-llm = ChatOpenAI(model="gpt-5-mini", temperature=0)
-
 def ingestion(state: AgentState) -> dict:
+    log_event("ingestion", "enter", {"state": state})
+
     user_text = state.get("user_input", "").strip()
     if not user_text:
         return {}
 
     new_messages: list[BaseMessage] = []
 
-    # Legg systemprompt inn én gang per session (thread_id)
     if not state.get("messages"):
         new_messages.append(SystemMessage(content=PROMPT))
+    else:
+         repaired = sanitize_messages(state["messages"])
+         if len(repaired) > len(state["messages"]):
+            new_messages.extend(
+                repaired[len(state["messages"]):]
+            )
 
     new_messages.append(HumanMessage(content=user_text))
-    return {"messages": new_messages}
 
-def agent(state: AgentState) -> dict:
-    response = llm.invoke(state["messages"])
-    return {"messages": [response]}
+    result = {"messages": new_messages}
 
-graph = StateGraph(AgentState)
-graph.add_node("ingestion", ingestion)
-graph.add_node("llm", agent)
-graph.add_edge(START, "ingestion")
-graph.add_edge("ingestion", "llm")
-graph.add_edge("llm", END)
+    log_event(
+        "ingestion",
+        "exit",
+        {"messages": dump_messages(new_messages)}
+    )
 
-# ceckpointing previous conversations in memory
-checkpointer = MemorySaver()
-app = graph.compile(checkpointer=checkpointer)
+    return result
 
-config = {"configurable": {"thread_id": "chat-1"}}
+def build_graph(llm, tools):
+    async def agent(state: AgentState) -> dict:
+        log_event(
+            "llm",
+            "enter",
+            {"messages": dump_messages(state["messages"])}
+        )
+        try:
+            response = await llm.ainvoke(state["messages"])
+        except Exception as e:
+            log_event("llm", "error", {"error": str(e)})
+            if "tool_calls must be followed" in str(e):
+                repaired = repair_messages(state["messages"])
+                response = await llm.ainvoke(repaired)
+                return {"messages": [response]}
+            raise
+        log_event(
+            "llm",
+            "exit",
+            {"response": dump_messages([response])}
+        )
 
-while True:
-    user_text = input("> ").strip()
-    if user_text.lower() in {"exit", "quit"}:
-        break
+        return {"messages": [response]}
 
-    state = app.invoke({"user_input": user_text}, config=config)
-    last = state["messages"][-1]
-    if isinstance(last, AIMessage):
-        print("Assistant:", last.content)
+    tool_node = ToolNode(tools)
+    async def tools_wrapper(state: AgentState):
+        log_event(
+            "tools",
+            "enter",
+            {"messages": dump_messages(state["messages"])}
+        )
+        try:
+            result = await tool_node.ainvoke(state)
+        except Exception as e:
+            log_event("tools", "error", {"error": str(e)})
+
+
+            last_msg = state["messages"][-1]
+            tool_calls = getattr(last_msg, "tool_calls", None) or []
+            tool_responses = []
+            for tc in tool_calls:
+                tool_responses.append(
+                    ToolMessage(
+                        tool_call_id=tc["id"],
+                        content=json.dumps(
+                            {
+                                "error": "tool_execution_failed",
+                                "tool": tc.get("name"),
+                                "message": str(e),
+                            }
+                        ),
+                    )
+                )
+            return {"messages": tool_responses}
+
+        log_event(
+            "tools",
+            "exit",
+            {"messages": dump_messages(result["messages"])}
+        )
+
+        return result
+
+    graph = StateGraph(AgentState)
+    graph.add_node("ingestion", ingestion)
+    graph.add_node("llm", agent)
+    graph.add_node("tools", tools_wrapper)
+
+    graph.add_edge(START, "ingestion")
+    graph.add_edge("ingestion", "llm")
+
+    # Hvis LLM ber om verktøy -> tools, ellers -> END
+    graph.add_conditional_edges("llm", tools_condition, {"tools": "tools", "__end__": END})
+
+    # Etter tools-kjøring, tilbake til llm for å fortsette
+    graph.add_edge("tools", "llm")
+
+    checkpointer = MemorySaver()
+    return graph.compile(checkpointer=checkpointer)
+
+async def main():
+    try:
+        client = MultiServerMCPClient(
+            {
+                "AI_MCP_Router": {
+                "transport": "streamable_http",
+                "url": "http://127.0.0.1:8000/mcp",
+                },
+            }
+        )
+
+        tools = await client.get_tools()
+
+    except Exception as e:
+        log_event("mcp", "error", {"error": str(e)})
+        print("Kunne ikke hente tools fra MCP")
+        return
+
+    llm = ChatOpenAI(model="gpt-5-mini", temperature=0).bind_tools(tools)
+    app = build_graph(llm, tools)
+
+    config = {"configurable": {"thread_id": "chat-1"}}
+
+    while True:
+        user_text = input("> ").strip()
+        if user_text.lower() in {"exit", "quit"}:
+            break
+        try:
+            state = await app.ainvoke({"user_input": user_text}, config=config)
+        except Exception as e:
+            log_event("graph", "error", {"error": str(e)})
+            print("Graf-feil. Se logger.")
+            continue
+
+        log_event(
+            "graph",
+            "final_state",
+            {"messages": dump_messages(state["messages"])}
+        )
+
+        # Siste AIMessage etter eventuelle tool-runder
+        last = state["messages"][-1]
+        if isinstance(last, AIMessage):
+            print("Assistant:", last.content)
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Server stoppet av bruker")
