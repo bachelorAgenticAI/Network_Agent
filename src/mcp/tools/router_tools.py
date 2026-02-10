@@ -1,7 +1,9 @@
 # router_tools.py
 import logging
+
 from utils.common import encode_intf, get_client
 from utils.routers import get_router
+
 
 async def get_interface(router_name: str, interface_name: str) -> dict:
     router = get_router(router_name)
@@ -10,7 +12,7 @@ async def get_interface(router_name: str, interface_name: str) -> dict:
     base = f"https://{router.host}/restconf"
 
     async with get_client(router) as client:
-        logging.info(f"starting sending restconf to router")
+        logging.info("starting sending restconf to router")
         r = await client.get(f"{base}/data/ietf-interfaces:interfaces/interface={intf}")
         r.raise_for_status()
         logging.info(f"Returning {interface_name} from {router.name}")

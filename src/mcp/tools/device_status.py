@@ -1,7 +1,9 @@
 # show_commands.py
 import logging
+
 from utils.common import get_client
 from utils.routers import get_router
+
 
 async def get_device_status(router_name: str) -> dict:
     """

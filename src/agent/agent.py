@@ -1,15 +1,16 @@
-from typing import Annotated, TypedDict
-from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, BaseMessage, AIMessage, SystemMessage, ToolMessage
-from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
-from langgraph.checkpoint.memory import MemorySaver
-from langgraph.prebuilt import ToolNode, tools_condition
-from langchain_mcp_adapters.client import MultiServerMCPClient
 import asyncio
 import json
-from utils.json_logger import log_event, dump_messages
+from typing import Annotated, TypedDict
+
+from dotenv import load_dotenv
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
+from langgraph.prebuilt import ToolNode, tools_condition
+from utils.json_logger import dump_messages, log_event
 from utils.sanitize_message import sanitize_messages
 
 load_dotenv()
@@ -65,7 +66,7 @@ def build_graph(llm, tools):
         except Exception as e:
             log_event("llm", "error", {"error": str(e)})
             if "tool_calls must be followed" in str(e):
-                repaired = repair_messages(state["messages"])
+                repaired = sanitize_messages(state["messages"])
                 response = await llm.ainvoke(repaired)
                 return {"messages": [response]}
             raise

@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
 from langchain_core.messages import BaseMessage
 
 LOG_FILE = Path("agent_trace.jsonl")

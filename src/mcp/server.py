@@ -1,8 +1,9 @@
 # server.py
 import logging
+
 from mcp.server.fastmcp import FastMCP
-from tools.router_tools import get_interface, set_interface_description
 from tools.device_status import get_device_status
+from tools.router_tools import get_interface, set_interface_description
 
 # ----------------- LOGGING -----------------
 logging.basicConfig(

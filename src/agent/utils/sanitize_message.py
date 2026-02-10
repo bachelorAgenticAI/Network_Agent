@@ -1,9 +1,9 @@
 import json
-from typing import List
 
-from langchain_core.messages import BaseMessage, AIMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 
-def sanitize_messages(messages: List[BaseMessage]) -> List[BaseMessage]:
+
+def sanitize_messages(messages: list[BaseMessage]) -> list[BaseMessage]:
     """
     Sørger for at alle tool_calls i historikken har en ToolMessage
     med matchende tool_call_id.
