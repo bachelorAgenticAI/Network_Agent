@@ -1,7 +1,7 @@
 # server.py
 import logging
 
-from fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP
 from tools.device_status import register_tools as register_device_status_tools
 from tools.router_tools import register_tools as register_router_tools
 
