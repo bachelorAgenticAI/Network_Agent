@@ -18,7 +18,10 @@ async def get_interface(router_name: str, interface_name: str) -> dict:
         logging.info(f"Returning {interface_name} from {router.name}")
         return r.json()
 
-async def set_interface_description(router_name: str, interface_name: str, description: str) -> dict:
+
+async def set_interface_description(
+    router_name: str, interface_name: str, description: str
+) -> dict:
     router = get_router(router_name)
     logging.info(f"Setting description for {interface_name} on {router.name} ({router.host})")
     intf = encode_intf(interface_name)
@@ -32,6 +35,14 @@ async def set_interface_description(router_name: str, interface_name: str, descr
     }
 
     async with get_client(router) as client:
-        r = await client.patch(f"{base}/data/ietf-interfaces:interfaces/interface={intf}", json=payload)
+        r = await client.patch(
+            f"{base}/data/ietf-interfaces:interfaces/interface={intf}", json=payload
+        )
         r.raise_for_status()
         return {"result": f"Description set on {interface_name}"}
+
+
+def register_tools(mcp):
+    mcp.tool(description="Get interface information from a router")(get_interface)
+
+    mcp.tool(description="Set interface description on a router")(set_interface_description)
