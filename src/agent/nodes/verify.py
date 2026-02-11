@@ -1,0 +1,1 @@
+# verify_node må sette verify = {"passed": bool, ...}.

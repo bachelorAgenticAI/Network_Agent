@@ -14,7 +14,7 @@ async def get_cpu_usage(router_name: str) -> dict:
 
     async with get_client(router) as client:
         try:
-            r = await client.get(f"{base}/data/cisco-platform:cpu")
+            r = await client.get(f"{base}/data/Cisco-IOS-XE-process-cpu-oper:cpu-usage")
             r.raise_for_status()
             return r.json()
         except Exception as e:
@@ -30,27 +30,11 @@ async def get_memory_usage(router_name: str) -> dict:
 
     async with get_client(router) as client:
         try:
-            r = await client.get(f"{base}/data/cisco-platform:memory")
+            r = await client.get(f"{base}/data/openconfig-platform:components")
             r.raise_for_status()
             return r.json()
         except Exception as e:
             logging.warning(f"Failed to get memory usage from {router.name}: {e}")
-            return {"error": str(e)}
-
-
-async def get_temperature(router_name: str) -> dict:
-    """Get temperature sensors from router via RESTCONF/YANG"""
-    router = get_router(router_name)
-    base = f"https://{router.host}/restconf"
-    logging.info(f"Fetching temperature from {router.name}")
-
-    async with get_client(router) as client:
-        try:
-            r = await client.get(f"{base}/data/cisco-platform:temperature")
-            r.raise_for_status()
-            return r.json()
-        except Exception as e:
-            logging.warning(f"Failed to get temperature from {router.name}: {e}")
             return {"error": str(e)}
 
 
@@ -62,7 +46,6 @@ async def get_system_health(router_name: str) -> dict:
     return {
         "cpu": await get_cpu_usage(router_name),
         "memory": await get_memory_usage(router_name),
-        "temperature": await get_temperature(router_name),
     }
 
 
@@ -72,5 +55,4 @@ async def get_system_health(router_name: str) -> dict:
 def register_health_tools(mcp):
     mcp.tool(description="Get CPU usage")(get_cpu_usage)
     mcp.tool(description="Get memory usage")(get_memory_usage)
-    mcp.tool(description="Get temperature sensors")(get_temperature)
     mcp.tool(description="Get full system health report")(get_system_health)
