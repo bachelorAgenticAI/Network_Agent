@@ -1,5 +1,5 @@
-
 # from utils.routers import get_router
+
 
 class Router:
     def __init__(self, name: str, host: str, user: str, password: str):
@@ -8,12 +8,16 @@ class Router:
         self.user = user
         self.password = password
 
+
 # Her legger vi inn alle rutere vi vil støtte
 ROUTERS = {
-    "router1": Router(name="Router 1", host="192.168.50.1", user="restconf", password="StrongPass123!"),
+    "router1": Router(
+        name="Router 1", host="192.168.50.1", user="restconf", password="StrongPass123!"
+    ),
     "router2": Router(name="Router 2", host="192.168.50.2", user="user", password="pass"),
     "router3": Router(name="Router 3", host="192.168.50.3", user="user", password="pass"),
 }
+
 
 def get_router(name: str) -> Router:
     """
