@@ -1,1 +1,0 @@
-# intent_node må sette intent til f.eks. "check" eller "check_and_fix" og gjerne approved (True/False).

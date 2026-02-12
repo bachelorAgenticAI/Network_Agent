@@ -1,1 +1,0 @@
-# diagnose_node må alltid sette diagnosis og needs_fix (bool).
