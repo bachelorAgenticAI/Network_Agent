@@ -73,7 +73,7 @@ async def get_device_status(router_name: str) -> dict:
 
 
 def register_tools(mcp):
-    mcp.tool(description="Get routing table information from a router")(get_routing_table)
+    #  mcp.tool(description="Get routing table information from a router")(get_routing_table)
 
     mcp.tool(description="Get interfaces information from a router")(get_interfaces)
 

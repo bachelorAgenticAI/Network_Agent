@@ -17,6 +17,7 @@ dependencies = [
     "mcp==1.24.0",
     "fastmcp==2.2.0",
     "ruff",
+    "asyncssh==2.22.0",
 ]
 
 [build-system]
