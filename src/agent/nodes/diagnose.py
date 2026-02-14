@@ -1,16 +1,17 @@
 # diagnose_node.py
 from __future__ import annotations
-import json
-from langchain_core.messages import SystemMessage
-from state.types import AgentState
-from state.schemas import Diagnosis
 
+import json
+
+from langchain_core.messages import SystemMessage
 from nodes.helpers.observations import (
-    extract_recent_tool_messages, 
-    extract_tool_call_map, 
-    tool_messages_to_observations
+    extract_recent_tool_messages,
+    extract_tool_call_map,
+    tool_messages_to_observations,
 )
 from nodes.helpers.persist import persist_observations
+from state.schemas import Diagnosis
+from state.types import AgentState
 from utils.logger import log_node_enter, log_node_exit, log_schema_output
 
 SYSTEM = """You are a network diagnostician.
@@ -29,7 +30,7 @@ def diagnose_node(state: AgentState, llm) -> dict:
     tool_call_map = extract_tool_call_map(state.get("messages", []))
     new_obs = tool_messages_to_observations(tool_msgs, tool_call_map)
 
-    observations = (state.get("observations") or []) + new_obs 
+    observations = (state.get("observations") or []) + new_obs
 
     db = persist_observations(
         new_obs,
@@ -47,7 +48,7 @@ def diagnose_node(state: AgentState, llm) -> dict:
     }
     log_node_enter("diagnose", ctx)
 
-    msg = SystemMessage(content=SYSTEM + "\n\nCTX:\n" + json.dumps(ctx, ensure_ascii=False))    
+    msg = SystemMessage(content=SYSTEM + "\n\nCTX:\n" + json.dumps(ctx, ensure_ascii=False))
     diag: Diagnosis = llm.with_structured_output(Diagnosis).invoke([msg])
     log_schema_output("diagnose", schema=Diagnosis, output=diag, state=state)
 
@@ -59,4 +60,3 @@ def diagnose_node(state: AgentState, llm) -> dict:
 
     log_node_exit("diagnose", patch)
     return patch
-

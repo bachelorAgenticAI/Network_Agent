@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
+
 from langchain_core.messages import SystemMessage
 from state.types import AgentState
-
 
 SYSTEM = """You are a network remediation agent.
 You receive a plan (steps, rollback, verification). Execute the necessary actions via tools.

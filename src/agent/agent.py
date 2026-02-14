@@ -1,21 +1,21 @@
 import asyncio
-from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
-from langchain_mcp_adapters.client import MultiServerMCPClient
-from langgraph.checkpoint.memory import MemorySaver
-from langgraph.graph import StateGraph, START, END
-from langgraph.prebuilt import ToolNode
 
-from state.types import AgentState
+from dotenv import load_dotenv
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import END, START, StateGraph
+from langgraph.prebuilt import ToolNode
+from nodes.assess_verify import assess_verify_node
+from nodes.collect_changes import collect_changes_node
+from nodes.diagnose import diagnose_node
+from nodes.get_info import get_info_node
 from nodes.ingestion import ingestion
 from nodes.intent import intent_node
-from nodes.get_info import get_info_node
-from nodes.diagnose import diagnose_node
 from nodes.remediation import remediation_node
-from nodes.verify import verify_node
 from nodes.summary import summary_node
-from nodes.collect_changes import collect_changes_node
-from nodes.assess_verify import assess_verify_node
+from nodes.verify import verify_node
+from state.types import AgentState
 
 load_dotenv()
 
@@ -27,7 +27,7 @@ def _wants_fix(intent: str | None) -> bool:
 def _route_from_controller(state: AgentState) -> str:
     v = state.get("verify") or {}
     if v.get("passed") is False:
-        if int(state.get("attempts", 0)) >= 5: # set value for retry limit
+        if int(state.get("attempts", 0)) >= 5:  # set value for retry limit
             return "summary"
         return "get_info"
 
@@ -40,7 +40,9 @@ def _route_from_controller(state: AgentState) -> str:
         return "summary"
 
     if _wants_fix(state.get("intent")):
-        if state.get("approved") is False and (state.get("plan") or {}).get("requires_approval", True):
+        if state.get("approved") is False and (state.get("plan") or {}).get(
+            "requires_approval", True
+        ):
             return "summary"
         return "remediation"
 
@@ -51,7 +53,7 @@ def _after_verify_assess(state: AgentState) -> str:
     v = state.get("verify") or {}
     if v.get("passed") is True:
         return "summary"
-    if int(state.get("attempts", 0)) >= 5: # set value for retry limit
+    if int(state.get("attempts", 0)) >= 5:  # set value for retry limit
         return "summary"
     return "intent"
 
@@ -69,8 +71,13 @@ def _reset_for_retry(state: AgentState) -> dict:
 
 
 def build_app(
-    llm_intent, llm_info, llm_remediate, llm_verify,
-    tools_info_node, tools_remediate_node, tools_verify_node,
+    llm_intent,
+    llm_info,
+    llm_remediate,
+    llm_verify,
+    tools_info_node,
+    tools_remediate_node,
+    tools_verify_node,
 ):
     graph = StateGraph(AgentState)
 
@@ -94,12 +101,16 @@ def build_app(
     graph.add_edge(START, "ingestion")
     graph.add_edge("ingestion", "intent")
 
-    graph.add_conditional_edges("intent", _route_from_controller, {
-        "get_info": "get_info",
-        "diagnose": "diagnose",
-        "remediation": "remediation",
-        "summary": "summary",
-    })
+    graph.add_conditional_edges(
+        "intent",
+        _route_from_controller,
+        {
+            "get_info": "get_info",
+            "diagnose": "diagnose",
+            "remediation": "remediation",
+            "summary": "summary",
+        },
+    )
 
     # Info path
     graph.add_edge("get_info", "tools_info")
@@ -113,10 +124,14 @@ def build_app(
     graph.add_edge("verify", "tools_verify")
     graph.add_edge("tools_verify", "assess_verify")
 
-    graph.add_conditional_edges("assess_verify", _after_verify_assess, {
-        "summary": "summary",
-        "intent": "inc_attempts",
-    })
+    graph.add_conditional_edges(
+        "assess_verify",
+        _after_verify_assess,
+        {
+            "summary": "summary",
+            "intent": "inc_attempts",
+        },
+    )
     graph.add_edge("inc_attempts", "reset_for_retry")
     graph.add_edge("reset_for_retry", "intent")
 
@@ -154,17 +169,19 @@ async def main():
     )
     """
     try:
-        client = MultiServerMCPClient({
-            "AI_MCP_Router": {
-                "transport": "streamable_http",
-                "url": "http://127.0.0.1:8000/mcp",
-            },
-        })
+        client = MultiServerMCPClient(
+            {
+                "AI_MCP_Router": {
+                    "transport": "streamable_http",
+                    "url": "http://127.0.0.1:8000/mcp",
+                },
+            }
+        )
 
         tools_all = await client.get_tools()
         print("TOOLS:", len(tools_all))
         print([getattr(t, "name", None) for t in tools_all])
-    except Exception as e:
+    except Exception:
         print("Kunne ikke hente tools fra MCP")
         return
 
@@ -185,8 +202,13 @@ async def main():
     tools_verify_node = ToolNode(tools_verify)
 
     app = build_app(
-        llm_intent, llm_info, llm_remediate, llm_verify,
-        tools_info_node, tools_remediate_node, tools_verify_node,
+        llm_intent,
+        llm_info,
+        llm_remediate,
+        llm_verify,
+        tools_info_node,
+        tools_remediate_node,
+        tools_verify_node,
     )
 
     config = {"configurable": {"thread_id": "chat-1"}}

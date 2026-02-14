@@ -1,13 +1,17 @@
 # nodes/helpers/persist.py
 from __future__ import annotations
+
 from typing import Any
+
 from nodes.helpers.memory_store import MemoryStore
+
 
 # Find device name from tool call arguments
 def infer_device(args: dict[str, Any], fallback: str | None = None) -> str | None:
     return args.get("router_name") or args.get("device") or fallback
 
-# 
+
+#
 def persist_observations(
     observations: list[dict],
     target: str | None = None,
@@ -51,7 +55,7 @@ def persist_observations(
             registry.append(tcid)
 
     # Save updated registry
-    MAX_IDS = 30 # Keep only most recent 30 tool call IDs to prevent unbounded growth
+    MAX_IDS = 30  # Keep only most recent 30 tool call IDs to prevent unbounded growth
     if len(registry) > MAX_IDS:
         registry = registry[-MAX_IDS:]
         seen = set(registry)
@@ -62,4 +66,3 @@ def persist_observations(
         store.save(db)
 
     return db
-

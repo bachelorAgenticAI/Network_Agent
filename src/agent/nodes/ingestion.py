@@ -15,15 +15,17 @@ def ingestion(state: AgentState) -> dict:
         updates["messages"] = [HumanMessage(content=txt)]
         # On new user input: do not blindly wipe everything; keep topology/observations/history
         # but clear controller fields that should be recomputed.
-        updates.update({
-            "intent": None,
-            "target": None,
-            "approved": False,
-            "needs_fix": None,
-            "diagnosis": {},
-            "plan": {},
-            "verify": {},
-            "attempts": 0,
-        })
+        updates.update(
+            {
+                "intent": None,
+                "target": None,
+                "approved": False,
+                "needs_fix": None,
+                "diagnosis": {},
+                "plan": {},
+                "verify": {},
+                "attempts": 0,
+            }
+        )
 
     return updates

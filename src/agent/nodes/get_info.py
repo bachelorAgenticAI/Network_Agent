@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import json
+
 from langchain_core.messages import SystemMessage
 from state.types import AgentState
-
 
 SYSTEM = """You are a network agent tasked with gathering facts via tools.
 Use available tools to collect information relevant to the intent/target and to build/update network topology.

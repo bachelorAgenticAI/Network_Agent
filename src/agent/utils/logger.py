@@ -1,14 +1,15 @@
 # utils/logger.py
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import uuid
-import hashlib
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 try:
     # optional, only for nicer schema introspection
@@ -34,14 +35,17 @@ MAX_DICT_ITEMS = 50
 # Trace context
 # -------------------------
 
+
 @dataclass
 class TraceContext:
     trace_id: str
     span_id: str | None = None
     parent_span_id: str | None = None
 
+
 def _new_id(prefix: str = "") -> str:
     return prefix + uuid.uuid4().hex[:16]
+
 
 def ensure_trace(state: dict) -> TraceContext:
     """
@@ -58,8 +62,10 @@ def ensure_trace(state: dict) -> TraceContext:
 # Time + IO
 # -------------------------
 
+
 def _ts() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f UTC")
+    return datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f UTC")
+
 
 def _append_jsonl(obj: dict) -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -71,6 +77,7 @@ def _append_jsonl(obj: dict) -> None:
 # -------------------------
 # clipping
 # -------------------------
+
 
 def _clip_str(s: str, n: int = MAX_STR) -> str:
     s = s.strip()
@@ -134,11 +141,13 @@ def _digest(payload: Any) -> str:
 # Schema extraction (short but meaningful)
 # -------------------------
 
+
 def _schema_name(schema: Any) -> str | None:
     if schema is None:
         return None
     cls = schema if isinstance(schema, type) else schema.__class__
     return getattr(cls, "__name__", str(cls))
+
 
 def _extract_diagnosis(d: Any) -> dict:
     # Accept dict or pydantic model
@@ -161,6 +170,7 @@ def _extract_diagnosis(d: Any) -> dict:
         "missing_info": (dd.get("missing_info") or [])[:10],
     }
 
+
 def _extract_plan(p: Any) -> dict:
     pp = _safe(p)
     return {
@@ -170,6 +180,7 @@ def _extract_plan(p: Any) -> dict:
         "rollback": (pp.get("rollback") or [])[:12],
     }
 
+
 def _extract_verify(v: Any) -> dict:
     vv = _safe(v)
     return {
@@ -178,6 +189,7 @@ def _extract_verify(v: Any) -> dict:
         "remaining_issues": (vv.get("remaining_issues") or [])[:10],
         "missing_info": (vv.get("missing_info") or [])[:10],
     }
+
 
 def _extract_intent(i: Any) -> dict:
     ii = _safe(i)
@@ -192,6 +204,7 @@ def _extract_intent(i: Any) -> dict:
         out["plan"] = _extract_plan(plan)
     return out
 
+
 def _extract_topology(t: Any) -> dict:
     tt = _safe(t)
     devices = tt.get("devices") or []
@@ -202,6 +215,7 @@ def _extract_topology(t: Any) -> dict:
         "recent_changes": (tt.get("recent_changes") or [])[:10],
     }
 
+
 # Registry of schema extractors by schema name
 _EXTRACTORS: dict[str, Callable[[Any], dict]] = {
     "Diagnosis": _extract_diagnosis,
@@ -210,6 +224,7 @@ _EXTRACTORS: dict[str, Callable[[Any], dict]] = {
     "IntentOut": _extract_intent,
     "TopologyInfo": _extract_topology,
 }
+
 
 def _schema_compact(schema: Any, obj: Any) -> dict:
     name = _schema_name(schema)
@@ -223,6 +238,7 @@ def _schema_compact(schema: Any, obj: Any) -> dict:
         except Exception:
             return {"name": name, "summary": None}
     return {"name": name, "summary": None}
+
 
 def _schema_fields(schema: Any) -> list[str] | None:
     if schema is None:
@@ -242,6 +258,7 @@ def _schema_fields(schema: Any) -> list[str] | None:
 # -------------------------
 # State summary (short and stable)
 # -------------------------
+
 
 def _state_summary(state: dict) -> dict:
     s = state or {}
@@ -290,6 +307,7 @@ def _state_summary(state: dict) -> dict:
 # Core event writers
 # -------------------------
 
+
 def _base_event(*, node: str, event: str, state: dict | None = None) -> dict:
     st = state or {}
     tr = TraceContext(trace_id=st.get("trace_id") or _new_id("tr_"))
@@ -301,10 +319,12 @@ def _base_event(*, node: str, event: str, state: dict | None = None) -> dict:
         "event": event,
     }
 
+
 def log_event(node: str, event: str, payload: dict, *, state: dict | None = None) -> None:
     evt = _base_event(node=node, event=event, state=state)
     evt["payload"] = _safe(payload)
     _append_jsonl(evt)
+
 
 def log_node_enter(node: str, state: dict) -> None:
     # create a span per node entry
@@ -320,6 +340,7 @@ def log_node_enter(node: str, state: dict) -> None:
         },
         state=state,
     )
+
 
 def log_node_exit(node: str, patch: dict, *, state: dict | None = None) -> None:
     # If state is provided, it links exit to the same trace/span
@@ -343,6 +364,7 @@ def log_node_exit(node: str, patch: dict, *, state: dict | None = None) -> None:
             }
 
     log_event(node, "exit", payload, state=state)
+
 
 def log_llm_invoke(
     node: str,
@@ -378,6 +400,7 @@ def log_llm_invoke(
         state=state,
     )
 
+
 def log_schema_output(
     node: str,
     *,
@@ -399,6 +422,7 @@ def log_schema_output(
         },
         state=state,
     )
+
 
 def log_edge_transfer(
     *,

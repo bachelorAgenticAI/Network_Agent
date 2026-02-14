@@ -1,13 +1,14 @@
 # collect_changes.py
 from __future__ import annotations
 
-from state.types import AgentState
 from nodes.helpers.observations import (
     extract_recent_tool_messages,
     extract_tool_call_map,
     tool_messages_to_observations,
 )
 from nodes.helpers.persist import persist_observations
+from state.types import AgentState
+
 
 def collect_changes_node(state: AgentState) -> dict:
     print("Collecting changes from recent tool calls...")
@@ -24,12 +25,15 @@ def collect_changes_node(state: AgentState) -> dict:
         flush_to_disk=True,
     )
 
-    new_changes = [{
-        "tool_name": o.get("tool_name"),
-        "tool_call_id": o.get("tool_call_id"),
-        "tool_args": o.get("tool_args"),
-        "result": o.get("content"),
-    } for o in obs]
+    new_changes = [
+        {
+            "tool_name": o.get("tool_name"),
+            "tool_call_id": o.get("tool_call_id"),
+            "tool_args": o.get("tool_args"),
+            "result": o.get("content"),
+        }
+        for o in obs
+    ]
 
     changes = (state.get("changes") or []) + new_changes
     return {

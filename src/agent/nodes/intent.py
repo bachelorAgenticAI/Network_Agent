@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import json
+
 from langchain_core.messages import SystemMessage
-from state.types import AgentState
 from state.schemas import IntentOut
-
+from state.types import AgentState
 from utils.logger import log_node_enter, log_node_exit, log_schema_output
-
 
 SYSTEM = """You are a network agent controller.
 Tasks:
@@ -46,7 +45,7 @@ def intent_node(state: AgentState, llm) -> dict:
     msg = SystemMessage(content=SYSTEM + "\n\nSTATE:\n" + json.dumps(ctx, ensure_ascii=False))
 
     out: IntentOut = llm.with_structured_output(IntentOut).invoke([msg])
-    
+
     log_schema_output("intent", schema=IntentOut, output=out, state=state)
 
     updates: dict = {
@@ -63,7 +62,7 @@ def intent_node(state: AgentState, llm) -> dict:
         if plan_dict:
             updates["plan"] = plan_dict
         updates["phase"] = "have_diagnosis"
-    
+
     # Log node exit with the updates and a preview of the new state
     log_node_exit("intent", updates)
     return updates

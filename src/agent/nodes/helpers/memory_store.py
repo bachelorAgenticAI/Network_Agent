@@ -1,8 +1,9 @@
 # nodes/helpers/memory_store.py
 from __future__ import annotations
+
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -10,13 +11,20 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MEMORY_DIR = PROJECT_ROOT / "memory"
 DB_PATH = MEMORY_DIR / "network_db.json"
 
+
 def _ensure() -> None:
     MEMORY_DIR.mkdir(parents=True, exist_ok=True)
     if not DB_PATH.exists():
-        DB_PATH.write_text(json.dumps({"devices": {}}, indent=2, ensure_ascii=False), encoding="utf-8")
+        DB_PATH.write_text(
+            json.dumps({"devices": {}}, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z") # "2024-06-01T12:00:00Z"
+    return (
+        datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    )  # "2024-06-01T12:00:00Z"
+
 
 @dataclass
 class MemoryStore:
@@ -58,12 +66,14 @@ class MemoryStore:
         latest[tool] = data
 
         if keep_history:
-            history.append({
-                "ts": ts or _utc_now(),
-                "tool": tool,
-                "args": args or {},
-                "keys": list(data.keys()) if isinstance(data, dict) else None,
-            })
+            history.append(
+                {
+                    "ts": ts or _utc_now(),
+                    "tool": tool,
+                    "args": args or {},
+                    "keys": list(data.keys()) if isinstance(data, dict) else None,
+                }
+            )
             if len(history) > history_limit:
                 dev["history"] = history[-history_limit:]
 
