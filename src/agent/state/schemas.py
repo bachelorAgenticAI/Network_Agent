@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class RootCause(BaseModel):
@@ -32,7 +32,7 @@ class VerifyResult(BaseModel):
 
 
 class IntentOut(BaseModel):
-    intent: str = Field(description='One of: "check", "check_and_fix", "fix", "unknown"')
+    intent: str = Literal["check", "check_and_fix", "fix", "unknown"]
     target: str | None = Field(default=None, description="Optional target device/site/service")
     approved: bool = Field(
         default=False, description="True only if user explicitly approved changes"
@@ -43,26 +43,78 @@ class IntentOut(BaseModel):
 
 
 # Network schemas
+class KV(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    k: str
+    v: str  # enklest; evt Union[str,int,float,bool,None]
 
 
 class Device(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     name: str
-    role: str | None = None  # "router", "switch", "host"
+    role: Literal["router", "switch", "host", "firewall", "ap", "unknown"] | None = None
     mgmt_ip: str | None = None
     vendor: str | None = None
-    meta: dict[str, Any] = Field(default_factory=dict)
+    meta: list[KV] = Field(default_factory=list)
+
+
+class Evidence(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    type: str | None = None
+    detail: str | None = None
+    meta: list[KV] = Field(default_factory=list)
 
 
 class Link(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     a_device: str
     a_if: str | None = None
     b_device: str
     b_if: str | None = None
     kind: Literal["lldp", "cdp", "arp", "traceroute", "manual", "unknown"] = "unknown"
-    evidence: list[dict[str, Any]] = Field(default_factory=list)
+    evidence: list[Evidence] = Field(default_factory=list)
+
+
+class Change(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    summary: str
+    meta: list[KV] = Field(default_factory=list)
 
 
 class TopologyInfo(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     devices: list[Device] = Field(default_factory=list)
     links: list[Link] = Field(default_factory=list)
-    recent_changes: list[dict[str, Any]] = Field(default_factory=list)
+    recent_changes: list[Change] = Field(default_factory=list)
+
+
+class Fact(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    claim: str
+    meta: list[KV] = Field(default_factory=list)
+
+
+class Source(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str | None = None
+    content: str | None = None
+    meta: list[KV] = Field(default_factory=list)
+
+
+class NetworkMeta(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    ts: str
+    target: str
+
+
+class NetworkDB(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    topology: TopologyInfo = Field(default_factory=TopologyInfo)
+    facts: list[Fact] = Field(default_factory=list)
+    sources: list[Source] = Field(default_factory=list)
+    meta: NetworkMeta | None = None
+
+
+class FormatResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    network_db: NetworkDB

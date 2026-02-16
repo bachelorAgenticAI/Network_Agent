@@ -30,4 +30,4 @@ def get_info_node(state: AgentState, llm) -> dict:
     ai = llm.invoke([msg], tool_choice="required")  # include tool_calls
     tc = getattr(ai, "tool_calls", None)
     print("tool_calls:", tc)
-    return {"messages": [ai], "phase": "have_info"}
+    return {"messages": [ai]}

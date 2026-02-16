@@ -14,14 +14,14 @@ In the first round (when user_input exists): classify intent and target, and whe
 When a diagnosis exists in state: determine needs_fix (True/False) and create a plan if needs_fix=True.
 
 Rules:
-- approved=True only with explicit approval (e.g., "yes, make the changes", "go ahead", "fix it").
+- approved=True means the user approves the agent to make changes.
+- If user respond check or no, approved should be False, and needs_fix should be None (not False).
 - If diagnosis is missing: needs_fix and plan must be null/empty.
 
 Intent:
 - "check": only check/diagnose
 - "check_and_fix": check and fix automatically if errors are found
 - "fix": fix (but requires info/diagnosis first)
-- "unknown": unclear
 Return pure JSON that matches the schema.
 """
 
@@ -31,6 +31,7 @@ def intent_node(state: AgentState, llm) -> dict:
     # Build compact context
     user_input = (state.get("user_input") or "").strip()
     diagnosis = state.get("diagnosis") or {}
+    print(diagnosis)
 
     ctx = {
         "user_input": user_input if user_input else None,

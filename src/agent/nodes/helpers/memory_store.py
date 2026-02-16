@@ -20,7 +20,7 @@ def _ensure() -> None:
         )
 
 
-def _utc_now() -> str:
+def utc_now() -> str:
     return (
         datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     )  # "2024-06-01T12:00:00Z"
@@ -37,9 +37,9 @@ class MemoryStore:
         except Exception:
             db = {"devices": {}}
 
-        # Ensure expected structure
         db.setdefault("devices", {})
         db.setdefault("persisted_tool_call_ids", [])
+        db.setdefault("network_db", {})
 
         return db
 
@@ -68,7 +68,7 @@ class MemoryStore:
         if keep_history:
             history.append(
                 {
-                    "ts": ts or _utc_now(),
+                    "ts": ts or utc_now(),
                     "tool": tool,
                     "args": args or {},
                     "keys": list(data.keys()) if isinstance(data, dict) else None,

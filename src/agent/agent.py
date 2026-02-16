@@ -9,6 +9,7 @@ from langgraph.prebuilt import ToolNode
 from nodes.assess_verify import assess_verify_node
 from nodes.collect_changes import collect_changes_node
 from nodes.diagnose import diagnose_node
+from nodes.format_network import format_network_node
 from nodes.get_info import get_info_node
 from nodes.ingestion import ingestion
 from nodes.intent import intent_node
@@ -31,7 +32,7 @@ def _route_from_controller(state: AgentState) -> str:
             return "summary"
         return "get_info"
 
-    if not state.get("observations"):
+    if state.get("phase") == "start":
         return "get_info"
     if not state.get("diagnosis"):
         return "diagnose"
@@ -67,6 +68,7 @@ def _reset_for_retry(state: AgentState) -> dict:
         "diagnosis": {},
         "needs_fix": None,
         "plan": {},
+        "phase": "start",
     }
 
 
@@ -84,6 +86,7 @@ def build_app(
     graph.add_node("ingestion", ingestion)
     graph.add_node("intent", lambda s: intent_node(s, llm_intent))
     graph.add_node("get_info", lambda s: get_info_node(s, llm_info))
+    graph.add_node("format_network", lambda s: format_network_node(s, llm_info))
     graph.add_node("diagnose", lambda s: diagnose_node(s, llm_info))
     graph.add_node("remediation", lambda s: remediation_node(s, llm_remediate))
     graph.add_node("collect_changes", collect_changes_node)
@@ -114,7 +117,8 @@ def build_app(
 
     # Info path
     graph.add_edge("get_info", "tools_info")
-    graph.add_edge("tools_info", "diagnose")
+    graph.add_edge("tools_info", "format_network")
+    graph.add_edge("format_network", "diagnose")
     graph.add_edge("diagnose", "intent")
 
     # Remediation + verify path

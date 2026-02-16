@@ -6,26 +6,13 @@ from state.types import AgentState
 
 def ingestion(state: AgentState) -> dict:
     txt = (state.get("user_input") or "").strip()
+    if not txt:
+        return {"phase": "start"}
 
-    updates: dict = {
+    prev = state.get("messages") or []
+    return {
         "phase": "start",
+        "messages": prev + [HumanMessage(content=txt)],
+        "intent": None,
+        "target": None,
     }
-
-    if txt:
-        updates["messages"] = [HumanMessage(content=txt)]
-        # On new user input: do not blindly wipe everything; keep topology/observations/history
-        # but clear controller fields that should be recomputed.
-        updates.update(
-            {
-                "intent": None,
-                "target": None,
-                "approved": False,
-                "needs_fix": None,
-                "diagnosis": {},
-                "plan": {},
-                "verify": {},
-                "attempts": 0,
-            }
-        )
-
-    return updates

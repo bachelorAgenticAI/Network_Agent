@@ -1,15 +1,8 @@
-# assess_verify.py
 from __future__ import annotations
 
 import json
 
-from langchain_core.messages import SystemMessage
-from nodes.helpers.observations import (
-    extract_recent_tool_messages,
-    extract_tool_call_map,
-    tool_messages_to_observations,
-)
-from nodes.helpers.persist import persist_observations
+from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
 from state.schemas import VerifyResult
 from state.types import AgentState
 from utils.logger import log_node_enter, log_node_exit, log_schema_output
@@ -22,20 +15,39 @@ Return structured output.
 """
 
 
+def _extract_recent_verify_tool_msgs(state: AgentState, limit: int = 30) -> list[dict]:
+    msgs = state.get("messages") or []
+
+    toolish = []
+    for m in reversed(msgs):
+        if isinstance(m, ToolMessage):
+            toolish.append(
+                {
+                    "type": "ToolMessage",
+                    "name": getattr(m, "name", None),
+                    "tool_call_id": getattr(m, "tool_call_id", None),
+                    "content": m.content,
+                }
+            )
+        elif isinstance(m, AIMessage) and (getattr(m, "tool_calls", None) or []):
+            toolish.append(
+                {
+                    "type": "AIMessage",
+                    "tool_calls": getattr(m, "tool_calls", None) or [],
+                }
+            )
+
+        if len(toolish) >= limit:
+            break
+
+    return list(reversed(toolish))
+
+
 def assess_verify_node(state: AgentState, llm) -> dict:
     print("Assessing verification results...")
-    tool_msgs = extract_recent_tool_messages(state.get("messages", []))
-    tool_call_map = extract_tool_call_map(state.get("messages", []))
-    obs = tool_messages_to_observations(tool_msgs, tool_call_map)
 
-    # Persist tool results to long-term DB + update in-memory state cache
-    db = persist_observations(
-        obs,
-        target=state.get("target"),
-        db=state.get("network_db"),
-        keep_history=True,
-        flush_to_disk=True,
-    )
+    db = state.get("network_db") or {}
+    obs = _extract_recent_verify_tool_msgs(state, limit=30)
 
     ctx = {
         "diagnosis": state.get("diagnosis") or {},
@@ -52,9 +64,8 @@ def assess_verify_node(state: AgentState, llm) -> dict:
     log_schema_output("assess_verify", schema=VerifyResult, output=out, state=state)
 
     patch = {
-        "network_db": db,  # <-- expose current state to the rest of the graph
         "verify": out.model_dump(),
     }
-    log_node_exit("assess_verify", patch)
 
+    log_node_exit("assess_verify", patch)
     return patch
