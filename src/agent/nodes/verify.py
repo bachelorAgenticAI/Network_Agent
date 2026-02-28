@@ -8,7 +8,7 @@ from state.types import AgentState
 SYSTEM = """You are a verification agent.
 Run relevant verify-tools based on the diagnosis, plan, and executed changes.
 
-IMPORTANT: every toolcall is used with arg: "router1" and never with hostname
+IMPORTANT: every toolcall is used with arg: "router1" and never with hostname. Use full interface names (e.g. "GigabitEthernet0/0/1" not "Gi0/0/1").
 
 Rules:
 - Use tools for verification (do not guess).

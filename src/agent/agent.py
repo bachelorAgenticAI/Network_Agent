@@ -27,8 +27,9 @@ def _wants_fix(intent: str | None) -> bool:
 
 def _route_from_controller(state: AgentState) -> str:
     v = state.get("verify") or {}
-    if v.get("passed") is False:
-        if int(state.get("attempts", 0)) >= 5:  # set value for retry limit
+    # Only retry after verification failure if we're past initial phase
+    if state.get("phase") != "start" and v.get("passed") is False:
+        if int(state.get("attempts", 0)) >= 2:  # set value for retry limit
             return "summary"
         return "get_info"
 
@@ -69,6 +70,7 @@ def _reset_for_retry(state: AgentState) -> dict:
         "needs_fix": None,
         "plan": {},
         "phase": "start",
+        "verify": {},  # Clear verify to avoid stale failure state
     }
 
 

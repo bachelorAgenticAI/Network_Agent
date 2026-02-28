@@ -32,7 +32,7 @@ class VerifyResult(BaseModel):
 
 
 class IntentOut(BaseModel):
-    intent: str = Literal["check", "check_and_fix", "fix", "unknown"]
+    intent: Literal["check", "check_and_fix", "fix", "unknown"] = "unknown"
     target: str | None = Field(default=None, description="Optional target device/site/service")
     approved: bool = Field(
         default=False, description="True only if user explicitly approved changes"
@@ -52,7 +52,7 @@ class KV(BaseModel):
 class Device(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
-    role: Literal["router", "switch", "host", "firewall", "ap", "unknown"] | None = None
+    role: Literal["router", "switch"] | None = None
     mgmt_ip: str | None = None
     vendor: str | None = None
     meta: list[KV] = Field(default_factory=list)
