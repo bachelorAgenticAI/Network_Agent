@@ -8,37 +8,57 @@ from state.types import AgentState
 from utils.logger import log_node_enter, log_node_exit, log_schema_output
 
 SYSTEM = """You are a network agent controller.
-Tasks:
 
-In the first round (when user_input exists): classify intent and target, and whether the user approves changes.
-When a diagnosis exists in state: determine needs_fix (True/False) and create a plan if needs_fix=True.
+Tasks:
+Main task is to classify intent and target and make decisions. You are the boss and authorize changes.
+
+When a diagnosis exists in state:
+- determine needs_fix (True/False)
+- Set needs_fix=False if the diagnosis indicates the intent has been fulfilled
+- create a plan if needs_fix=True.
 
 Rules:
-- approved=True means the user approves the agent to make changes.
-- If user respond check or no, approved should be False, and needs_fix should be None (not False).
 - If diagnosis is missing: needs_fix and plan must be null/empty.
+- If verify shows the problem is still present, verify must be set to an empty dict.
 
 Intent:
-- "check": only check/diagnose
-- "check_and_fix": check and fix automatically if errors are found
-- "fix": fix (but requires info/diagnosis first)
+- Base intent on input/alert (check, check_and_fix) and create a suitable intent_description for other nodes.
+- If the input/alert does NOT describe a concrete problem, OR the agent appears to be operating in a network for the first time, you MUST:
+  - set intent = "check"
+  - create an intent_description stating that the goal is to learn as much as possible about the network, discover its structure and state, identify all potential problems or risks.
+- If the input/alert does describe a concrete problem:
+ - set intent = "check_and_fix"
+
+Plan:
+- Do NOT include: authorization/approval requests, “confirm”, “get credentials”, “SSH/CLI commands”, “enter config mode”, “backup config”, “document/audit”, or long verification procedures.
+- If required info is missing, do NOT put it in plan_steps; it must be placed in diagnosis.missing_info instead.
+- Base the plan heavily on (user input)/alert, and use diagnosis only to fill necessary details on how to fix the issue related to the input/alert.
+- Do not create plans for minor or unrelated problems from diagnosis.
+- Do not create a plan unless the input/alert indicates a desire for fixing/remediation.
+- plan_steps MUST be short and executable instructions for the remediation node.
+
+
 Return pure JSON that matches the schema.
 """
 
+# need to add state.get types to properly log state in this node
+
 
 def intent_node(state: AgentState, llm) -> dict:
-    print("Determining intent and plan...")
-    # Build compact context
+    print("Determining intent")
+    # Uses only the latest user input
     user_input = (state.get("user_input") or "").strip()
-    diagnosis = state.get("diagnosis") or {}
-    print(diagnosis)
+    diagnosis = state.get("diagnosis")
+    intent_description = state.get("intent_description") or {}
 
     ctx = {
         "user_input": user_input if user_input else None,
-        "current_intent": state.get("intent"),
+        "intent_description": intent_description if intent_description else None,
+        "current_intent": state.get("intent") or [],
         "current_target": state.get("target"),
-        "approved": state.get("approved", False),
         "diagnosis": diagnosis if diagnosis else None,
+        "previous_changes": state.get("changes") or [],
+        "previous_verify": state.get("verify") or {},
     }
 
     log_node_enter("intent", ctx)
@@ -52,18 +72,30 @@ def intent_node(state: AgentState, llm) -> dict:
     updates: dict = {
         "intent": out.intent,
         "target": out.target,
-        "approved": bool(out.approved),
+        "intent_description": out.intent_description,
     }
 
     # Only set needs_fix/plan after diagnosis exists
-    if diagnosis:
+    if diagnosis is not None:
+        # Tom diagnose => ingen funn => ikke noe å fikse
+        if not (diagnosis.get("root_causes") or diagnosis.get("risks") or diagnosis.get("missing_info")):
+            updates["needs_fix"] = False
+            updates["plan"] = {}
+            updates["phase"] = "have_diagnosis"
+            log_node_exit("intent", updates)
+            print("attempts in assess_verify:", state.get("attempts"))
+            return updates
+
         if out.needs_fix is not None:
             updates["needs_fix"] = bool(out.needs_fix)
         plan_dict = out.plan.model_dump()
         if plan_dict:
+            print("Added plan to state")
             updates["plan"] = plan_dict
+            print(plan_dict)
         updates["phase"] = "have_diagnosis"
 
     # Log node exit with the updates and a preview of the new state
     log_node_exit("intent", updates)
+    print("attempts in assess_verify:", state.get("attempts"))
     return updates

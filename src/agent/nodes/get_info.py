@@ -7,10 +7,11 @@ from langchain_core.messages import SystemMessage
 from state.types import AgentState
 
 SYSTEM = """You are a network agent tasked with gathering facts via tools.
-Use available tools to collect information relevant to the intent/target and to build/update network topology.
+Use available tools to collect information relevant to the intent_description and target and to build/update network topology.
 
 IMPORTANT: every toolcall is used with arg: "router1" and never with hostname
 Requirements:
+- You can not use tools that makes changes (e.g set_interface)
 - You must use tools (tool calls) to retrieve data (do not guess).
 - Do not provide a final diagnosis here.
 - After tool calls: do not write a long report. Keep it brief.
@@ -20,9 +21,9 @@ Requirements:
 def get_info_node(state: AgentState, llm) -> dict:
     print("Gathering information with tools...")
     ctx = {
-        "intent": state.get("intent"),
+        "intent_description": state.get("intent_description"),
         "target": state.get("target"),
-        "network_db": state.get("network_db") or {},
+        "previous_network_information": state.get("network_db") or {},
         "attempts": state.get("attempts", 0),
     }
 

@@ -9,10 +9,21 @@ def ingestion(state: AgentState) -> dict:
     if not txt:
         return {"phase": "start"}
 
-    prev = state.get("messages") or []
+    # Reset state on new user input to avoid confusion from leftover state. This ensures the agent focuses on the current prompt.
+    # Keep message history to maintain conversation context, but clear out any prior diagnosis, plan, etc. that could mislead the agent.
     return {
         "phase": "start",
-        "messages": prev + [HumanMessage(content=txt)],
+        "user_input": txt,
+        "messages": [HumanMessage(content=txt)],
         "intent": None,
         "target": None,
+        "attempts": 0,
+        "network_db": {},
+        "observations": [],
+        "diagnosis": None,
+        "needs_fix": None,
+        "plan": {},
+        "changes": [],
+        "verify": {},
+        "remedy_start_cursor": 0,
     }

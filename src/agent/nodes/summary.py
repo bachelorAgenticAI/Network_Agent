@@ -19,6 +19,7 @@ def summary_node(state: AgentState, llm) -> dict:
     print("Generating summary for user...")
     ctx = {
         "intent": state.get("intent"),
+        "intent_description": state.get("intent_description"),
         "target": state.get("target"),
         "network_db": state.get("network_db") or {},
         "diagnosis": state.get("diagnosis") or {},

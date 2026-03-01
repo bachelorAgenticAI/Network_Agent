@@ -18,11 +18,9 @@ class Diagnosis(BaseModel):
 
 
 class Plan(BaseModel):
+    problem: str = ""
+    fix_summary: str = ""
     plan_steps: list[str] = Field(default_factory=list)
-    verification: list[str] = Field(default_factory=list)
-    rollback: list[str] = Field(default_factory=list)
-    requires_approval: bool = True
-
 
 class VerifyResult(BaseModel):
     passed: bool
@@ -32,11 +30,9 @@ class VerifyResult(BaseModel):
 
 
 class IntentOut(BaseModel):
-    intent: Literal["check", "check_and_fix", "fix", "unknown"] = "unknown"
+    intent: Literal["check", "check_and_fix"] = Field(description="Base intent of input")
+    intent_description: str = Field(description="Explain the intent for other nodes")
     target: str | None = Field(default=None, description="Optional target device/site/service")
-    approved: bool = Field(
-        default=False, description="True only if user explicitly approved changes"
-    )
     # Post-diagnosis decision
     needs_fix: bool | None = Field(default=None, description="Set after diagnosis is present")
     plan: Plan = Field(default_factory=Plan)

@@ -21,10 +21,6 @@ from state.types import AgentState
 load_dotenv()
 
 
-def _wants_fix(intent: str | None) -> bool:
-    return intent in {"check_and_fix", "fix"}
-
-
 def _route_from_controller(state: AgentState) -> str:
     v = state.get("verify") or {}
     # Only retry after verification failure if we're past initial phase
@@ -35,17 +31,15 @@ def _route_from_controller(state: AgentState) -> str:
 
     if state.get("phase") == "start":
         return "get_info"
-    if not state.get("diagnosis"):
+
+    d = state.get("diagnosis")  # kan være None
+    if d is None:
         return "diagnose"
 
     if state.get("needs_fix") is False:
         return "summary"
 
-    if _wants_fix(state.get("intent")):
-        if state.get("approved") is False and (state.get("plan") or {}).get(
-            "requires_approval", True
-        ):
-            return "summary"
+    if state.get("intent") == "check_and_fix":
         return "remediation"
 
     return "summary"
@@ -61,16 +55,20 @@ def _after_verify_assess(state: AgentState) -> str:
 
 
 def _inc_attempts(state: AgentState) -> dict:
-    return {"attempts": int(state.get("attempts", 0)) + 1}
+    attempts = state.get("attempts")
+    if attempts is None:
+        attempts = 0
+
+    attempts += 1
+    return {"attempts": attempts}
 
 
 def _reset_for_retry(state: AgentState) -> dict:
     return {
-        "diagnosis": {},
+        "diagnosis": None,
         "needs_fix": None,
         "plan": {},
         "phase": "start",
-        "verify": {},  # Clear verify to avoid stale failure state
     }
 
 

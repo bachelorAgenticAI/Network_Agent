@@ -66,3 +66,8 @@ memory/
 # =========================
 .DS_Store
 Thumbs.db
+
+# =========================
+# Workspace files
+# =========================
+*.code-workspace

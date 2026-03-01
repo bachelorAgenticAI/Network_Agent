@@ -10,7 +10,7 @@ from utils.logger import log_node_enter, log_node_exit, log_schema_output
 SYSTEM = """You evaluate the result of verify-tools and conclude passed=True/False.
 Rules:
 - Base your assessment on ToolMessage outputs.
-- passed=True only if the verification actually shows that the problem is gone.
+- passed=True only if the verification actually shows that the designated problem is gone.
 Return structured output.
 """
 
@@ -68,4 +68,5 @@ def assess_verify_node(state: AgentState, llm) -> dict:
     }
 
     log_node_exit("assess_verify", patch)
+    print(patch)
     return patch

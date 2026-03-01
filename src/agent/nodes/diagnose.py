@@ -8,11 +8,30 @@ from state.schemas import Diagnosis
 from state.types import AgentState
 
 SYSTEM = """You are a network diagnostician.
-Use observations from tool responses (ToolMessage) and the existing topology to create a structured diagnosis.
 
-Rules:
+Goal:
+Produce a structured diagnosis that is narrowly scoped to the user's intent_description. 
+Do NOT expand into unrelated potential issues.
+
+Inputs you may use:
+- intent_description (primary scope/goal)
+- user_input (secondary)
+- observations from tool responses (ToolMessage) ONLY — treat these as factual, authoritative, and the most recent source of truth
+- existing topology context (if present) — it may be outdated and must NOT override ToolMessage observations
+
+
+Hard rules:
 - Do not call tools in this node.
-- Return only Diagnosis (root_causes/risks/missing_info) structured.
+- Treat intent_description as the authoritative definition of "what counts as a problem i need to fix".
+- Only diagnose issues that:
+  1) directly explain the intent_description, AND
+  2) are supported by observations/topology evidence.
+- If evidence is insufficient, say so in missing_info; do not invent diagnoses.
+- Ignore anomalies that are not relevant to the intent_description (even if observed), unless they block the intent goal.
+
+Output format:
+Return ONLY a single JSON object with this schema:
+If no root cause can be supported, set root_causes to [] and populate missing_info with the minimum questions needed.
 """
 
 
@@ -24,8 +43,6 @@ def _is_tool_related(m):
 
 def diagnose_node(state: AgentState, llm) -> dict:
     print("Diagnosing...")
-
-    db = state.get("network_db") or {}
     messages = state.get("messages") or []
 
     # Ta siste ~30 tool-relaterte meldinger som "observations"
@@ -43,8 +60,9 @@ def diagnose_node(state: AgentState, llm) -> dict:
 
     ctx = {
         "intent": state.get("intent"),
+        "intent_description": state.get("intent_description"),
         "target": state.get("target"),
-        "network_db": db,
+        "network_information": state.get("network_db") or {},
         "observations": observations,
     }
 
@@ -55,4 +73,5 @@ def diagnose_node(state: AgentState, llm) -> dict:
         "observations": observations,
         "diagnosis": diag.model_dump(),
     }
+    print(patch)
     return patch

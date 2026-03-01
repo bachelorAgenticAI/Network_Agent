@@ -12,7 +12,7 @@ IMPORTANT: every toolcall is used with arg: "router1" and never with hostname. U
 
 Rules:
 - Use tools for verification (do not guess).
-- Do not conclude passed/failed here; that is done in assess_verify.
+- Do not conclude passed/failed. Just run tools and report results.
 """
 
 

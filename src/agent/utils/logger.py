@@ -174,7 +174,6 @@ def _extract_diagnosis(d: Any) -> dict:
 def _extract_plan(p: Any) -> dict:
     pp = _safe(p)
     return {
-        "requires_approval": pp.get("requires_approval"),
         "plan_steps": (pp.get("plan_steps") or [])[:12],
         "verification": (pp.get("verification") or [])[:12],
         "rollback": (pp.get("rollback") or [])[:12],
@@ -195,8 +194,8 @@ def _extract_intent(i: Any) -> dict:
     ii = _safe(i)
     out = {
         "intent": ii.get("intent"),
+        "intent_description": ii.get("intent_description"),
         "target": ii.get("target"),
-        "approved": ii.get("approved"),
         "needs_fix": ii.get("needs_fix"),
     }
     plan = ii.get("plan")
@@ -265,6 +264,13 @@ def _state_summary(state: dict) -> dict:
     msgs = s.get("messages") or []
     obs = s.get("observations") or []
     chg = s.get("changes") or []
+    d = s.get("diagnosis") or {}
+
+    has_diagnosis = bool(
+        (d.get("root_causes") or [])
+        or (d.get("risks") or [])
+        or (d.get("missing_info") or [])
+    )   
 
     def _msg_tail():
         tail = []
@@ -283,10 +289,10 @@ def _state_summary(state: dict) -> dict:
     devices = (db.get("devices") or {}) if isinstance(db, dict) else {}
     return {
         "intent": s.get("intent"),
+        "intent_description": s.get("intent_description"),
         "target": s.get("target"),
         "phase": s.get("phase"),
         "attempts": s.get("attempts"),
-        "approved": s.get("approved"),
         "needs_fix": s.get("needs_fix"),
         "counts": {
             "messages": len(msgs),
@@ -296,7 +302,7 @@ def _state_summary(state: dict) -> dict:
         "messages_tail": _msg_tail(),
         "devices_n": len(devices) if isinstance(devices, dict) else None,
         "has": {
-            "diagnosis": bool(s.get("diagnosis")),
+            "diagnosis": has_diagnosis,
             "plan": bool(s.get("plan")),
             "verify": bool(s.get("verify")),
         },
@@ -358,9 +364,9 @@ def log_node_exit(node: str, patch: dict, *, state: dict | None = None) -> None:
             payload["plan"] = _extract_plan(patch.get("plan"))
         if "verify" in patch:
             payload["verify"] = _extract_verify(patch.get("verify"))
-        if any(k in patch for k in ("intent", "target", "approved", "needs_fix")):
+        if any(k in patch for k in ("intent", "target", "needs_fix")):
             payload["intent_update"] = {
-                k: patch.get(k) for k in ("intent", "target", "approved", "needs_fix") if k in patch
+                k: patch.get(k) for k in ("intent", "target", "needs_fix") if k in patch
             }
 
     log_event(node, "exit", payload, state=state)
