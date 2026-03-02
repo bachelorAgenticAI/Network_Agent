@@ -49,7 +49,7 @@ def _after_verify_assess(state: AgentState) -> str:
     v = state.get("verify") or {}
     if v.get("passed") is True:
         return "summary"
-    if int(state.get("attempts", 0)) >= 5:  # set value for retry limit
+    if int(state.get("attempts", 0)) >= 2:  # set value for retry limit 2=3 rounds
         return "summary"
     return "intent"
 
@@ -66,9 +66,10 @@ def _inc_attempts(state: AgentState) -> dict:
 def _reset_for_retry(state: AgentState) -> dict:
     return {
         "diagnosis": None,
-        "needs_fix": None,
+        "needs_fix": False,
         "plan": {},
         "phase": "start",
+        "verify": {}, # reset verify to avoid infinite loop
     }
 
 

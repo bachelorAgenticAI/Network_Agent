@@ -40,6 +40,7 @@ def collect_changes_node(state: AgentState) -> dict:
             )
 
     changes = (state.get("changes") or []) + new_changes
+    print(changes)
     return {
         "changes": changes,
         "remedy_start_cursor": len(messages),

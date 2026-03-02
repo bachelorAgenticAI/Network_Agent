@@ -28,14 +28,13 @@ Intent:
   - create an intent_description stating that the goal is to learn as much as possible about the network, discover its structure and state, identify all potential problems or risks.
 - If the input/alert does describe a concrete problem:
  - set intent = "check_and_fix"
-
-Plan:
+ - If attempts > 0, you have already tried to fix the problem, but it is still not resolved.
 - Do NOT include: authorization/approval requests, “confirm”, “get credentials”, “SSH/CLI commands”, “enter config mode”, “backup config”, “document/audit”, or long verification procedures.
 - If required info is missing, do NOT put it in plan_steps; it must be placed in diagnosis.missing_info instead.
 - Base the plan heavily on (user input)/alert, and use diagnosis only to fill necessary details on how to fix the issue related to the input/alert.
 - Do not create plans for minor or unrelated problems from diagnosis.
 - Do not create a plan unless the input/alert indicates a desire for fixing/remediation.
-- plan_steps MUST be short and executable instructions for the remediation node.
+- plan_steps MUST be short and executable instructions for the remediation node and not include steps for "After changes: verify" etc.
 
 
 Return pure JSON that matches the schema.
@@ -50,6 +49,10 @@ def intent_node(state: AgentState, llm) -> dict:
     user_input = (state.get("user_input") or "").strip()
     diagnosis = state.get("diagnosis")
     intent_description = state.get("intent_description") or {}
+    messages = state.get("messages") or []
+    print("Previous messages in state:")
+    for m in messages:
+        print(f"- {type(m).__name__}: {getattr(m, 'content', '')[:100]}")  # print type and content preview
 
     ctx = {
         "user_input": user_input if user_input else None,
@@ -57,10 +60,10 @@ def intent_node(state: AgentState, llm) -> dict:
         "current_intent": state.get("intent") or [],
         "current_target": state.get("target"),
         "diagnosis": diagnosis if diagnosis else None,
-        "previous_changes": state.get("changes") or [],
-        "previous_verify": state.get("verify") or {},
+        "failed_changes": state.get("changes") or [],
+        "number_of_attempts": state.get("attempts", 0),
     }
-
+    print("Intent node context:", ctx)
     log_node_enter("intent", ctx)
 
     msg = SystemMessage(content=SYSTEM + "\n\nSTATE:\n" + json.dumps(ctx, ensure_ascii=False))

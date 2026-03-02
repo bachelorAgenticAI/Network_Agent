@@ -9,7 +9,8 @@ from state.types import AgentState
 SYSTEM = """You are a network agent tasked with gathering facts via tools.
 Use available tools to collect information relevant to the intent_description and target and to build/update network topology.
 
-IMPORTANT: every toolcall is used with arg: "router1" and never with hostname
+IMPORTANT: every toolcall is used with arg: "router<number>" and never with hostname
+If no router number is provided, use previous_network_information to find the relevant router<number> for the target device/devices. 
 Requirements:
 - You can not use tools that makes changes (e.g set_interface)
 - You must use tools (tool calls) to retrieve data (do not guess).

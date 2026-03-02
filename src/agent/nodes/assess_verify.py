@@ -68,5 +68,4 @@ def assess_verify_node(state: AgentState, llm) -> dict:
     }
 
     log_node_exit("assess_verify", patch)
-    print(patch)
     return patch

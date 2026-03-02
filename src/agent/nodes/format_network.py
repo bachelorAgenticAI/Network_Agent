@@ -10,19 +10,47 @@ from state.schemas import FormatResult
 from state.types import AgentState
 
 SYSTEM = """
-Return ONLY JSON that matches FormatResult.
+You reconstruct network_db by MERGING updates from recent_tool_data into previous_network_db.
+
+Return ONLY JSON matching FormatResult.
 
 Input:
 - previous_network_db (may be empty)
-- recent_tool_data: the latest ~30 tool-related messages (AI tool_calls + Tool results)
+- recent_tool_data (~30 latest tool_calls + tool results)
 
-Task:
-- Compare previous_network_db with new information in recent_tool_data.
-- Update/fix the topology accordingly, or keep it the same if still accurate.
-- Add any facts including description of devices, links, configs, issues, timestamps, etc.
-- Produce a NEW network_db that reflects the most accurate current state.
-- Do not guess: unknown ⇒ empty fields/lists.
-- network_db.meta must include ts (ISO8601 Z) and target.
+Key rule — incremental updates:
+- recent_tool_data is PARTIAL.
+- Never delete or overwrite entities just because they are missing from this round.
+- Absence in recent_tool_data ≠ removal or change.
+- Example: if Route 1 is fetched but Route 2 is not, Route 2 must remain unchanged.
+
+Update logic:
+- Modify ONLY entities explicitly referenced in tool results.
+- Merge new facts into existing entities.
+- Keep all other entities unchanged.
+
+Freshness:
+- Updated facts:
+  - update last_seen_ts
+  - stale = false
+- Non-updated facts:
+  - keep existing values
+  - mark stale = true
+  - DO NOT change last_seen_ts
+
+Conflicts:
+- Prefer newer tool results.
+- Store replaced values in history[] with timestamp + source.
+
+Null handling:
+- Set values to null ONLY if a tool explicitly reports unknown/unavailable.
+
+Meta:
+- network_db.meta.ts = current reconstruction time (ISO8601 Z)
+- Preserve or propagate meta.target.
+
+Goal:
+Produce a NEW network_db reflecting the best known state without losing previously known information.
 """
 
 
