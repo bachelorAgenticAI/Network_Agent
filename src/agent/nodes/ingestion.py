@@ -24,6 +24,7 @@ def ingestion(state: AgentState) -> dict:
         "user_input": txt,
         "messages": messages,
         "intent": None,
+        "intent_description": None,
         "target": None,
         "attempts": 0,
         "network_db": {},

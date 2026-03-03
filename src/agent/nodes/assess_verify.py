@@ -12,6 +12,7 @@ Rules:
 - Base your assessment on ToolMessage outputs.
 - Use the most recent verification round as primary evidence.
 - passed=True only if the verification actually shows that the designated problem is gone.
+- Passed=false if verification shows the problem is still there OR if evidence is missing/inconclusive.
 - If evidence is missing or inconclusive, set passed=False and populate missing_info.
 Return structured output.
 """

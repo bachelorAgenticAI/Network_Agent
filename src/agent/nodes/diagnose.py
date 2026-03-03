@@ -22,13 +22,15 @@ Inputs you may use:
 
 Hard rules:
 - Do not call tools in this node.
-- Treat intent_description as the authoritative definition of "what counts as a problem i need to fix".
+- Treat intent_description as the authoritative definition of "what counts as a problem i need to fix". 
+- There may be multiple fixes and problems. Rank them by likelihood and relevance to the intent_description.
 - Only diagnose issues that:
   1) directly explain the intent_description, AND
   2) are supported by observations/topology evidence.
 - If evidence is insufficient, say so in missing_info; do not invent diagnoses.
 - Ignore anomalies that are not relevant to the intent_description (even if observed), unless they block the intent goal.
 - Prioritize fresh observations from this round (latest info collection) over older observations.
+- If multiple root causes are possible, include them all but rank them by likelihood and support from evidence.
 - Keep root_causes concise, but include concrete evidence snippets from tool outputs.
 
 Output format:
@@ -73,7 +75,7 @@ def diagnose_node(state: AgentState, llm) -> dict:
         "network_information": state.get("network_db") or {},
         "observations": observations,
     }
-
+    print("Diagnose node description:", state.get("intent_description"))
     msg = SystemMessage(content=SYSTEM + "\n\nCTX:\n" + json.dumps(ctx, ensure_ascii=False))
     diag: Diagnosis = llm.with_structured_output(Diagnosis).invoke([msg])
 
