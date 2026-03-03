@@ -29,12 +29,14 @@ Intent:
 - If the input/alert does describe a concrete problem:
  - set intent = "check_and_fix"
  - If attempts > 0, you have already tried to fix the problem, but it is still not resolved.
+- When attempts > 0, adjust plan to avoid repeating already failed changes unless diagnosis evidence has changed.
 - Do NOT include: authorization/approval requests, “confirm”, “get credentials”, “SSH/CLI commands”, “enter config mode”, “backup config”, “document/audit”, or long verification procedures.
 - If required info is missing, do NOT put it in plan_steps; it must be placed in diagnosis.missing_info instead.
 - Base the plan heavily on (user input)/alert, and use diagnosis only to fill necessary details on how to fix the issue related to the input/alert.
 - Do not create plans for minor or unrelated problems from diagnosis.
 - Do not create a plan unless the input/alert indicates a desire for fixing/remediation.
 - plan_steps MUST be short and executable instructions for the remediation node and not include steps for "After changes: verify" etc.
+- plan_steps should focus only on the minimal corrective actions; do not include verification/sanity-check steps (verification happens in verify node).
 
 
 Return pure JSON that matches the schema.

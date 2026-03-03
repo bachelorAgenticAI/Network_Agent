@@ -70,6 +70,8 @@ def _reset_for_retry(state: AgentState) -> dict:
         "plan": {},
         "phase": "start",
         "verify": {}, # reset verify to avoid infinite loop
+        "info_start_cursor": 0,
+        "verify_start_cursor": 0,
     }
 
 
