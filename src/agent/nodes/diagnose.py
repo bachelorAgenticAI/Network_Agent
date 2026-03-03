@@ -10,7 +10,7 @@ from state.types import AgentState
 SYSTEM = """You are a network diagnostician.
 
 Goal:
-Produce a structured diagnosis that is narrowly scoped to the user's intent_description. 
+Produce a structured diagnosis that is narrowly scoped to the user's intent_description.
 Do NOT expand into unrelated potential issues.
 Do NOT include confirmation steps or verification steps in the diagnosis. Focus on identifying the root cause(s) of the problem as defined by the intent_description.
 
@@ -20,7 +20,6 @@ Inputs you may use:
 - observations from tool responses (ToolMessage) ONLY — treat these as factual, authoritative, and the most recent source of truth
 - existing topology context (if present) — it may be outdated and must NOT override ToolMessage observations
 
-
 Hard rules:
 - Do not call tools in this node.
 - Treat intent_description as the authoritative definition of "what counts as a problem i need to fix".
@@ -29,6 +28,8 @@ Hard rules:
   2) are supported by observations/topology evidence.
 - If evidence is insufficient, say so in missing_info; do not invent diagnoses.
 - Ignore anomalies that are not relevant to the intent_description (even if observed), unless they block the intent goal.
+- Prioritize fresh observations from this round (latest info collection) over older observations.
+- Keep root_causes concise, but include concrete evidence snippets from tool outputs.
 
 Output format:
 Return ONLY a single JSON object with this schema:
@@ -46,8 +47,13 @@ def diagnose_node(state: AgentState, llm) -> dict:
     print("Diagnosing...")
     messages = state.get("messages") or []
 
-    # Ta siste ~30 tool-relaterte meldinger som "observations"
-    recent_tool_msgs = [m for m in messages if _is_tool_related(m)][-30:]
+    info_start = int(state.get("info_start_cursor") or 0)
+    recent_window = messages[info_start:]
+
+    recent_tool_msgs = [m for m in recent_window if _is_tool_related(m)][-30:]
+    if not recent_tool_msgs:
+        recent_tool_msgs = [m for m in messages if _is_tool_related(m)][-30:]
+
     observations = []
     for m in recent_tool_msgs:
         if isinstance(m, ToolMessage):
@@ -63,6 +69,7 @@ def diagnose_node(state: AgentState, llm) -> dict:
         "intent": state.get("intent"),
         "intent_description": state.get("intent_description"),
         "target": state.get("target"),
+        "attempts": state.get("attempts", 0),
         "network_information": state.get("network_db") or {},
         "observations": observations,
     }

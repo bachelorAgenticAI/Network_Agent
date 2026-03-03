@@ -25,8 +25,10 @@ class AgentState(TypedDict, total=False):
     diagnosis: dict
     needs_fix: bool
     plan: dict
+    info_start_cursor: int
 
     # Remediation / verify
     changes: list[dict]
     verify: dict
     remedy_start_cursor: int
+    verify_start_cursor: int
