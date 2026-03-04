@@ -29,6 +29,8 @@ class AgentState(TypedDict, total=False):
 
     # Remediation / verify
     changes: list[dict]
+    remediation_step_idx: int
+    remediation_done: bool
     verify: dict
     remedy_start_cursor: int
     verify_start_cursor: int

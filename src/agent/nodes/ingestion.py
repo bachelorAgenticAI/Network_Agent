@@ -33,6 +33,8 @@ def ingestion(state: AgentState) -> dict:
         "needs_fix": None,
         "plan": {},
         "changes": [],
+        "remediation_step_idx": 0,
+        "remediation_done": False,
         "verify": {},
         "remedy_start_cursor": 0,
     }

@@ -74,6 +74,7 @@ def diagnose_node(state: AgentState, llm) -> dict:
         "attempts": state.get("attempts", 0),
         "network_information": state.get("network_db") or {},
         "observations": observations,
+        "previous_changes": state.get("changes") or [],
     }
     print("Diagnose node description:", state.get("intent_description"))
     msg = SystemMessage(content=SYSTEM + "\n\nCTX:\n" + json.dumps(ctx, ensure_ascii=False))

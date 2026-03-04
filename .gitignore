@@ -36,6 +36,7 @@ dist/
 .coverage.*
 htmlcov/
 .tox/
+Inputs.md
 
 # =========================
 # Type checking

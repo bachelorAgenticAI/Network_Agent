@@ -12,7 +12,9 @@ SYSTEM = """You are a network agent controller.
 ROLE
 You classify intent and decide whether remediation is required.
 You are the only node that authorizes changes.
-
+You may make reasonable assumptions about incomplete input and translate a high-level request into the necessary configuration steps.
+For optional fields such as names, descriptions, or labels: 
+- use the values from the input when provided; otherwise generate reasonable defaults.
 DECISION FLOW
 
 1. Diagnosis Handling
@@ -49,10 +51,13 @@ DECISION FLOW
 - If attempts > 0:
   - A previous remediation failed.
   - Do NOT repeat previously failed corrective actions unless diagnosis evidence has materially changed.
+  - Read previous_changes, may be success or failure
 
 PLAN RULES (only if plan is created)
-- plan_steps must contain only minimal corrective actions.
-- Steps must be short, direct, and executable by the remediation node.
+- plan_steps must be atomic: one step = one device change = one remediation tool call.
+- Do not include multiple actions in one step. If you need 3 changes, create 3 steps.
+- Each step must include device: "router<number>" and full interface names where applicable (e.g. "GigabitEthernet0/0/1" not "Gi0/0/1").
+- Each step must specify exactly one action from the remediation tools supported actions.
 - Do NOT include:
   - approval/authorization language
   - confirmations
@@ -66,6 +71,7 @@ PLAN RULES (only if plan is created)
   - Do NOT guess.
   - Place missing details in diagnosis.missing_info.
   - Set plan = null if missing information prevents safe remediation.
+  - If new diagnosis remains consistent with previous diagnosis, you may reuse previously failed plan steps that are still relevant.
 - Do not create plans for minor or unrelated findings in diagnosis.
 
 OUTPUT
@@ -88,7 +94,7 @@ def intent_node(state: AgentState, llm) -> dict:
         "current_intent": state.get("intent") or [],
         "current_target": state.get("target"),
         "diagnosis": diagnosis if diagnosis else None,
-        "failed_changes": state.get("changes") or [],
+        "Previous_changes": state.get("changes") or [],
         "number_of_attempts": state.get("attempts", 0),
     }
     print("Intent node context:", ctx)

@@ -54,6 +54,12 @@ def _after_verify_assess(state: AgentState) -> str:
     return "intent"
 
 
+def _after_collect_changes(state: AgentState) -> str:
+    if state.get("remediation_done") is True:
+        return "verify"
+    return "remediation"
+
+
 def _inc_attempts(state: AgentState) -> dict:
     attempts = state.get("attempts")
     if attempts is None:
@@ -70,6 +76,8 @@ def _reset_for_retry(state: AgentState) -> dict:
         "plan": {},
         "phase": "start",
         "verify": {}, # reset verify to avoid infinite loop
+        "remediation_step_idx": 0,
+        "remediation_done": False,
         "info_start_cursor": 0,
         "verify_start_cursor": 0,
     }
@@ -127,7 +135,14 @@ def build_app(
     # Remediation + verify path
     graph.add_edge("remediation", "tools_remediate")
     graph.add_edge("tools_remediate", "collect_changes")
-    graph.add_edge("collect_changes", "verify")
+    graph.add_conditional_edges(
+        "collect_changes",
+        _after_collect_changes,
+        {
+            "remediation": "remediation",
+            "verify": "verify",
+        },
+    )
     graph.add_edge("verify", "tools_verify")
     graph.add_edge("tools_verify", "assess_verify")
 

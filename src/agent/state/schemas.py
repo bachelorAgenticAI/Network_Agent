@@ -16,11 +16,18 @@ class Diagnosis(BaseModel):
     risks: list[str] = Field(default_factory=list)
     missing_info: list[str] = Field(default_factory=list)
 
+class PlanStep(BaseModel):
+    id: int
+    device: str  # "router<number>"
+    action: str
+    target: str | None = None
+    parameters: list[str] = Field(default_factory=list)
+
 
 class Plan(BaseModel):
     problem: str = ""
     fix_summary: str = ""
-    plan_steps: list[str] = Field(default_factory=list)
+    plan_steps: list[PlanStep] = Field(default_factory=list)
 
 class VerifyResult(BaseModel):
     passed: bool

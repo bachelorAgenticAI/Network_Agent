@@ -12,11 +12,13 @@ Use available tools to collect information relevant to the intent_description an
 IMPORTANT: every toolcall is used with arg: "router<number>" and never with hostname. Use full interface names (e.g. "GigabitEthernet0/0/1" not "Gi0/0/1").
 If no router number is provided, use previous_network_information to find the relevant router<number> for the target device/devices.
 Requirements:
+- Always run tools to get full overview of network state 
+- Secondary to that, use tools that directly validate the intent_description
 - You can not use tools that makes changes (e.g set_interface)
 - You must use tools (tool calls) to retrieve data (do not guess).
-- Prefer tools that directly validate the symptom first, then gather context needed to isolate likely root cause.
 - Prioritize fresh observations over previous_network_information if they conflict.
 - If attempts > 0, avoid repeating the exact same tool+args combinations unless they are required to confirm state drift.
+- Use previous_changes to avoid repeating the same tool calls that have already been made, unless they are required to confirm state drift.
 - Do not provide a final diagnosis here.
 - After tool calls: do not write a long report. Keep it brief.
 """
