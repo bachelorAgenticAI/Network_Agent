@@ -13,6 +13,7 @@ from mcp_app.tools.rem_dhcp import rem_dhcp_tools
 from mcp_app.tools.rem_interface import rem_interface_tools
 from mcp_app.tools.rem_ospf import rem_ospf_tools
 from mcp_app.tools.rem_routing import rem_routing_tools
+from mcp_app.tools.router_names import list_router_names
 
 # ----------------- LOGGING -----------------
 logging.basicConfig(
@@ -26,6 +27,7 @@ mcp = FastMCP("AI_MCP_Router")
 
 
 # Diagnose tools:
+list_router_names(mcp)
 register_config_tools(mcp)
 register_interface_tools(mcp)
 register_arp_tools(mcp)

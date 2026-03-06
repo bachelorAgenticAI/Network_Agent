@@ -11,8 +11,8 @@ class Router:
 
 # Her legger vi inn alle rutere vi vil støtte
 ROUTERS = {
-    "router1": Router(name="Router 1", host="192.168.50.1", user="restconf", password="pswd"),
-    "router2": Router(name="Router 2", host="192.168.50.2", user="restconf", password="pswd"),
+    "router1": Router(name="Rango", host="192.168.50.1", user="restconf", password="pswd"),
+    "router2": Router(name="Django", host="192.168.50.2", user="restconf", password="pswd"),
 }
 
 
