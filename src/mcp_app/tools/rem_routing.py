@@ -1,8 +1,8 @@
 # static_route.py
 import logging
 
-from utils.common import get_client
-from utils.routers import get_router
+from mcp_app.utils.common import get_client
+from mcp_app.utils.routers import get_router
 
 
 async def add_static_route(router_name: str, network: str, mask: str, next_hop: str) -> dict:
@@ -34,6 +34,7 @@ async def add_static_route(router_name: str, network: str, mask: str, next_hop: 
             logging.error(f"Failed to add static route on {router.name}: {e}")
             return {"status": "error", "message": str(e)}
 
+
 async def delete_static_route(router_name: str) -> dict:
     """
     Delete a specific static route from a Cisco IOS-XE router using DELETE.
@@ -41,7 +42,7 @@ async def delete_static_route(router_name: str) -> dict:
     """
     router = get_router(router_name)
     logging.info(f"Deleting static route 172.16.100.0/24 on {router.name}")
-    
+
     # Path targets the specific route list item using prefix and mask as keys
     url = (
         f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/ip/route/"
@@ -53,35 +54,28 @@ async def delete_static_route(router_name: str) -> dict:
             # Perform the DELETE request
             r = await client.delete(url)
             r.raise_for_status()
-            
+
             return {
-                "status": "success", 
-                "message": f"Static route 172.16.100.0/24 deleted from {router.name}"
+                "status": "success",
+                "message": f"Static route 172.16.100.0/24 deleted from {router.name}",
             }
         except Exception as e:
             logging.error(f"Failed to delete static route on {router.name}: {e}")
             return {"status": "error", "message": str(e)}
-    
+
+
 async def configure_default_route(router_name: str, next_hop: str) -> dict:
-    
+
     router = get_router(router_name)
     logging.info(f"Creating default route via {next_hop} on {router.name}")
-    
+
     # Path to the parent container to create the route
     url = f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/ip/route"
 
     # Payload to define the default route entry
     payload = {
         "Cisco-IOS-XE-native:ip-route-interface-forwarding-list": [
-            {
-                "prefix": "0.0.0.0",
-                "mask": "0.0.0.0",
-                "fwd-list": [
-                    {
-                        "fwd": next_hop
-                    }
-                ]
-            }
+            {"prefix": "0.0.0.0", "mask": "0.0.0.0", "fwd-list": [{"fwd": next_hop}]}
         ]
     }
 
@@ -90,14 +84,15 @@ async def configure_default_route(router_name: str, next_hop: str) -> dict:
             # POST creates the default route entry
             r = await client.post(url, json=payload)
             r.raise_for_status()
-            
+
             return {
-                "status": "success", 
-                "message": f"Default route set via {next_hop} on {router.name}"
+                "status": "success",
+                "message": f"Default route set via {next_hop} on {router.name}",
             }
         except Exception as e:
             logging.error(f"Failed to set default route on {router.name}: {e}")
             return {"status": "error", "message": str(e)}
+
 
 async def delete_default_route(router_name: str) -> dict:
     """
@@ -105,7 +100,7 @@ async def delete_default_route(router_name: str) -> dict:
     """
     router = get_router(router_name)
     logging.info(f"Deleting default route on {router.name}")
-    
+
     # Path targets the specific route list item using prefix and mask as keys
     url = (
         f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/ip/route/"
@@ -117,46 +112,35 @@ async def delete_default_route(router_name: str) -> dict:
             # Perform the DELETE request
             r = await client.delete(url)
             r.raise_for_status()
-            
-            return {
-                "status": "success", 
-                "message": f"Default route deleted from {router.name}"
-            }
+
+            return {"status": "success", "message": f"Default route deleted from {router.name}"}
         except Exception as e:
             logging.error(f"Failed to delete default route on {router.name}: {e}")
             return {"status": "error", "message": str(e)}
 
+
 async def modify_route_metric(
-    router_name: str, 
-    prefix: str, 
-    mask: str, 
-    next_hop: str, 
-    metric_value: int
+    router_name: str, prefix: str, mask: str, next_hop: str, metric_value: int
 ) -> dict:
     """
     Modify the metric (Administrative Distance) for a specific static route.
     """
     router = get_router(router_name)
     logging.info(f"Modifying metric to {metric_value} for {prefix} on {router.name}")
-    
+
     # Path to the parent container
     url = f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/ip/route"
 
     # Payload to update the metric
     payload = {
         "Cisco-IOS-XE-native:route": {
-          "ip-route-interface-forwarding-list": [
-            {
-              "prefix": prefix,
-              "mask": mask,
-              "fwd-list": [
+            "ip-route-interface-forwarding-list": [
                 {
-                  "fwd": next_hop,
-                  "metric": metric_value
+                    "prefix": prefix,
+                    "mask": mask,
+                    "fwd-list": [{"fwd": next_hop, "metric": metric_value}],
                 }
-              ]
-            }
-          ]
+            ]
         }
     }
 
@@ -165,35 +149,32 @@ async def modify_route_metric(
             # PATCH updates the route configuration
             r = await client.patch(url, json=payload)
             r.raise_for_status()
-            
+
             return {
-                "status": "success", 
-                "message": f"Metric set to {metric_value} for {prefix} via {next_hop} on {router.name}"
+                "status": "success",
+                "message": f"Metric set to {metric_value} for {prefix} via {next_hop} on {router.name}",
             }
         except Exception as e:
             logging.error(f"Failed to modify metric on {router.name}: {e}")
             return {"status": "error", "message": str(e)}
 
 
-
 def rem_routing_tools(mcp):
+    mcp.tool(description=("Add or merge a static IPv4 route into router configuration."))(
+        add_static_route
+    )
+
     mcp.tool(
         description=(
-            "Add or merge a static IPv4 route into router configuration."
+            "Delete the hardcoded static route 172.16.100.0/24 used by this implementation."
         )
-    )(add_static_route)
-
-    mcp.tool(
-        description=("Delete the hardcoded static route 172.16.100.0/24 used by this implementation.")
     )(delete_static_route)
 
-    mcp.tool(
-        description=("Create default route (0.0.0.0/0) towards specified next-hop.")
-    )(configure_default_route)
+    mcp.tool(description=("Create default route (0.0.0.0/0) towards specified next-hop."))(
+        configure_default_route
+    )
 
-    mcp.tool(
-        description=("Delete default static route (0.0.0.0/0).")
-    )(delete_default_route)
+    mcp.tool(description=("Delete default static route (0.0.0.0/0)."))(delete_default_route)
 
     mcp.tool(
         description=("Set metric/administrative value on a specific static route next-hop entry.")

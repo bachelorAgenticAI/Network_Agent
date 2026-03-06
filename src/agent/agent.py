@@ -76,7 +76,7 @@ def _reset_for_retry(state: AgentState) -> dict:
         "needs_fix": None,
         "plan": {},
         "phase": "start",
-        "verify": {}, # reset verify to avoid infinite loop
+        "verify": {},  # reset verify to avoid infinite loop
         "remediation_step_idx": 0,
         "remediation_done": False,
         "info_start_cursor": 0,

@@ -1,40 +1,35 @@
 # ospf_tools.py
-import logging
-from utils.common import get_client, encode_intf
-from utils.routers import get_router
+from mcp_app.utils.common import encode_intf, get_client
+from mcp_app.utils.routers import get_router
 
 # --- OSPF PROSESSSTYRING ---
 
-async def configure_ospf_process(
-    router_name: str, 
-    process_id: int, 
-    router_id: str = None
-) -> dict:
+
+async def configure_ospf_process(router_name: str, process_id: int, router_id: str = None) -> dict:
     """
     Configures or updates an OSPF process with a specific Router-ID
     using a targeted RESTCONF path.
     """
     router = get_router(router_name)
-    
+
     # Target the specific list instance rather than the parent container
     path = f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/router/Cisco-IOS-XE-ospf:router-ospf/ospf/process-id={process_id}"
-    
+
     # Payload should match the structure of the resource you are patching
-    payload = {
-        "Cisco-IOS-XE-ospf:process-id": {
-            "id": process_id,
-            "router-id": router_id
-        }
-    }
+    payload = {"Cisco-IOS-XE-ospf:process-id": {"id": process_id, "router-id": router_id}}
 
     async with get_client(router) as client:
         try:
             # PATCH updates only the fields provided
             r = await client.patch(path, json=payload)
             r.raise_for_status()
-            return {"status": "success", "message": f"OSPF {process_id} updated with router-id {router_id}"}
+            return {
+                "status": "success",
+                "message": f"OSPF {process_id} updated with router-id {router_id}",
+            }
         except Exception as e:
             return {"status": "error", "message": f"Failed to set router-id: {str(e)}"}
+
 
 async def delete_ospf_process(router_name: str, process_id: int) -> dict:
     """
@@ -51,21 +46,19 @@ async def delete_ospf_process(router_name: str, process_id: int) -> dict:
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
+
 # --- OSPF NETTVERK / AREAS ---
 
+
 async def add_ospf_network(
-    router_name: str, 
-    process_id: int, 
-    ip_network: str, 
-    wildcard: str, 
-    area: int
+    router_name: str, process_id: int, ip_network: str, wildcard: str, area: int
 ) -> dict:
     """
     Legger til et nettverk i en OSPF area.
     """
     router = get_router(router_name)
     path = f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/router"
-    
+
     payload = {
         "Cisco-IOS-XE-native:router": {
             "Cisco-IOS-XE-ospf:router-ospf": {
@@ -73,13 +66,7 @@ async def add_ospf_network(
                     "process-id": [
                         {
                             "id": process_id,
-                            "network": [
-                                {
-                                    "ip": ip_network,
-                                    "wildcard": wildcard,
-                                    "area": area
-                                }
-                            ]
+                            "network": [{"ip": ip_network, "wildcard": wildcard, "area": area}],
                         }
                     ]
                 }
@@ -95,33 +82,25 @@ async def add_ospf_network(
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
+
 # --- GRENSESNITT OSPF (COST) ---
 
-async def set_interface_ospf_cost(
-    router_name: str, 
-    interface_name: str, 
-    cost: int
-) -> dict:
+
+async def set_interface_ospf_cost(router_name: str, interface_name: str, cost: int) -> dict:
     """
     Setter OSPF cost på et spesifikt grensesnitt.
     """
     router = get_router(router_name)
     interface_type = "".join(filter(str.isalpha, interface_name))
-    interface_id = interface_name[len(interface_type):]
+    interface_id = interface_name[len(interface_type) :]
     encoded_id = encode_intf(interface_id)
-    
+
     path = f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/interface/{interface_type}={encoded_id}"
 
     payload = {
         f"Cisco-IOS-XE-native:{interface_type}": {
             "name": interface_id,
-            "ip": {
-                "Cisco-IOS-XE-ospf:router-ospf": {
-                    "ospf": {
-                        "cost": cost
-                    }
-                }
-            }
+            "ip": {"Cisco-IOS-XE-ospf:router-ospf": {"ospf": {"cost": cost}}},
         }
     }
 
@@ -129,9 +108,13 @@ async def set_interface_ospf_cost(
         try:
             r = await client.patch(path, json=payload)
             r.raise_for_status()
-            return {"status": "success", "message": f"OSPF cost satt til {cost} på {interface_name}"}
+            return {
+                "status": "success",
+                "message": f"OSPF cost satt til {cost} på {interface_name}",
+            }
         except Exception as e:
             return {"status": "error", "message": str(e)}
+
 
 async def remove_interface_ospf_cost(router_name: str, interface_name: str) -> dict:
     """
@@ -139,9 +122,9 @@ async def remove_interface_ospf_cost(router_name: str, interface_name: str) -> d
     """
     router = get_router(router_name)
     interface_type = "".join(filter(str.isalpha, interface_name))
-    interface_id = interface_name[len(interface_type):]
+    interface_id = interface_name[len(interface_type) :]
     encoded_id = encode_intf(interface_id)
-    
+
     path = f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/interface/{interface_type}={encoded_id}/ip/Cisco-IOS-XE-ospf:router-ospf/ospf/cost"
 
     async with get_client(router) as client:
@@ -152,12 +135,11 @@ async def remove_interface_ospf_cost(router_name: str, interface_name: str) -> d
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
+
 # --- OSPF DEFAULT ROUTE ANNONSERING ---
 
-async def enable_ospf_default_information_originate(
-    router_name: str,
-    process_id: int
-) -> dict:
+
+async def enable_ospf_default_information_originate(router_name: str, process_id: int) -> dict:
     """
     Aktiverer default-information originate i OSPF prosess.
     Tilsvarer:
@@ -171,26 +153,22 @@ async def enable_ospf_default_information_originate(
     )
 
     payload = {
-        "Cisco-IOS-XE-ospf:process-id": {
-            "id": process_id,
-            "default-information": {
-                "originate": {}
-            }
-        }
+        "Cisco-IOS-XE-ospf:process-id": {"id": process_id, "default-information": {"originate": {}}}
     }
 
     async with get_client(router) as client:
         try:
             r = await client.patch(path, json=payload)
             r.raise_for_status()
-            return {"status": "success", "message": f"OSPF {process_id}: default-information originate aktivert."}
+            return {
+                "status": "success",
+                "message": f"OSPF {process_id}: default-information originate aktivert.",
+            }
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-async def disable_ospf_default_information_originate(
-    router_name: str,
-    process_id: int
-) -> dict:
+
+async def disable_ospf_default_information_originate(router_name: str, process_id: int) -> dict:
     """
     Deaktiverer default-information originate i OSPF prosess.
     Tilsvarer:
@@ -207,42 +185,35 @@ async def disable_ospf_default_information_originate(
         try:
             r = await client.delete(path)
             r.raise_for_status()
-            return {"status": "success", "message": f"OSPF {process_id}: default-information originate deaktivert."}
+            return {
+                "status": "success",
+                "message": f"OSPF {process_id}: default-information originate deaktivert.",
+            }
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
 
 def rem_ospf_tools(mcp):
+    mcp.tool(description=("Create or update OSPF process settings, including optional Router-ID."))(
+        configure_ospf_process
+    )
+    mcp.tool(description=("Delete an entire OSPF process and its process-level configuration."))(
+        delete_ospf_process
+    )
     mcp.tool(
-        description=("Create or update OSPF process settings, including optional Router-ID.")
-    )(configure_ospf_process)
-    mcp.tool(
-        description=(
-            "Delete an entire OSPF process and its process-level configuration."
-        )
-    )(delete_ospf_process)
-    mcp.tool(
-        description=(
-            "Add network statement to an OSPF area for route advertisement/participation."
-        )
+        description=("Add network statement to an OSPF area for route advertisement/participation.")
     )(add_ospf_network)
+    mcp.tool(description=("Set OSPF interface cost to influence path selection."))(
+        set_interface_ospf_cost
+    )
     mcp.tool(
-        description=(
-            "Set OSPF interface cost to influence path selection."
-        )
-    )(set_interface_ospf_cost)
-    mcp.tool(
-        description=(
-            "Remove explicit OSPF interface cost to return to default cost behavior."
-        )
+        description=("Remove explicit OSPF interface cost to return to default cost behavior.")
     )(remove_interface_ospf_cost)
     mcp.tool(
         description=(
             "Enable 'default-information originate' under an OSPF process to advertise default route."
         )
     )(enable_ospf_default_information_originate)
-    mcp.tool(
-        description=(
-            "Disable 'default-information originate' under an OSPF process."
-        )
-    )(disable_ospf_default_information_originate)
+    mcp.tool(description=("Disable 'default-information originate' under an OSPF process."))(
+        disable_ospf_default_information_originate
+    )

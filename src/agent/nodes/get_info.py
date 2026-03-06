@@ -17,7 +17,6 @@ Requirements:
 - Secondary to that, use tools that directly validate the intent_description
 - You can not use tools that makes changes (e.g set_interface)
 - You must use tools (tool calls) to retrieve data (do not guess).
-- Prioritize fresh observations over previous_network_information if they conflict.
 - If attempts > 0, avoid repeating the exact same tool+args combinations unless they are required to confirm state drift.
 - Use previous_changes to avoid repeating the same tool calls that have already been made, unless they are required to confirm state drift.
 - Do not provide a final diagnosis here.
@@ -30,7 +29,6 @@ def get_info_node(state: AgentState, llm) -> dict:
     ctx = {
         "intent_description": state.get("intent_description"),
         "target": state.get("target"),
-        "previous_network_information": state.get("network_db") or {},
         "attempts": state.get("attempts", 0),
         "previous_changes": state.get("changes") or [],
     }

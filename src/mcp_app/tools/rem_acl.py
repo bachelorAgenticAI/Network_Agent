@@ -1,39 +1,28 @@
 # acl_tools.py
 import logging
-import json
-import urllib.parse 
 
-from utils.common import get_client, encode_intf  
-from utils.routers import get_router
+from mcp_app.utils.common import encode_intf, get_client
+from mcp_app.utils.routers import get_router
+
 
 async def create_standard_acl(
-    router_name: str, 
-    acl_name: str, 
-    sequence: int, 
-    action: str, 
-    network: str, 
-    mask: str
+    router_name: str, acl_name: str, sequence: int, action: str, network: str, mask: str
 ) -> dict:
     """
     Oppretter en ny Standard ACL med en første regel.
     """
     router = get_router(router_name)
     path = f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/ip/access-list"
-    
+
     payload = {
         "Cisco-IOS-XE-acl:standard": {
             "name": str(acl_name),
             "access-list-seq-rule": [
                 {
                     "sequence": str(sequence),
-                    action.lower(): {
-                        "std-ace": {
-                            "ipv4-prefix": network,
-                            "mask": mask
-                        }
-                    }
+                    action.lower(): {"std-ace": {"ipv4-prefix": network, "mask": mask}},
                 }
-            ]
+            ],
         }
     }
 
@@ -42,7 +31,7 @@ async def create_standard_acl(
     async with get_client(router) as client:
         try:
             r = await client.post(path, json=payload)
-            
+
             if r.status_code == 409:
                 return {
                     "status": "error",
@@ -59,12 +48,9 @@ async def create_standard_acl(
             logging.error(f"Feil ved opprettelse av ACL {acl_name} på {router.name}: {e}")
             return {"status": "error", "message": str(e)}
 
+
 async def create_extended_acl(
-    router_name: str,
-    acl_name: str,
-    sequence: int,
-    action: str,
-    protocol: str
+    router_name: str, acl_name: str, sequence: int, action: str, protocol: str
 ) -> dict:
     """
     Oppretter en ny Extended ACL med en første regel (Any to Any).
@@ -73,7 +59,7 @@ async def create_extended_acl(
     router = get_router(router_name)
     # Vi bruker samme sti som i standard_acl og curl-eksempelet ditt
     path = f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/ip/access-list"
-    
+
     # Payload strukturert nøyaktig som din fungerende curl
     payload = {
         "Cisco-IOS-XE-native:access-list": {
@@ -86,11 +72,11 @@ async def create_extended_acl(
                             "ace-rule": {
                                 "action": action.lower(),
                                 "protocol": protocol.lower(),
-                                "any": [None],      # 'null' i JSON blir 'None' i Python
-                                "dst-any": [None]
-                            }
+                                "any": [None],  # 'null' i JSON blir 'None' i Python
+                                "dst-any": [None],
+                            },
                         }
-                    ]
+                    ],
                 }
             ]
         }
@@ -102,7 +88,7 @@ async def create_extended_acl(
         try:
             # Vi bruker PATCH her slik som i din fungerende curl-kommando
             r = await client.patch(path, json=payload)
-            
+
             if r.status_code == 409:
                 return {
                     "status": "error",
@@ -118,14 +104,10 @@ async def create_extended_acl(
         except Exception as e:
             logging.error(f"Feil ved opprettelse av Extended ACL {acl_name} på {router.name}: {e}")
             return {"status": "error", "message": str(e)}
-        
+
+
 async def add_standard_acl_rule(
-    router_name: str, 
-    acl_name: str, 
-    sequence: int, 
-    action: str, 
-    network: str, 
-    mask: str
+    router_name: str, acl_name: str, sequence: int, action: str, network: str, mask: str
 ) -> dict:
     """
     Legger til en regel i en eksisterende Standard ACL ved hjelp av PATCH.
@@ -139,14 +121,9 @@ async def add_standard_acl_rule(
             "access-list-seq-rule": [
                 {
                     "sequence": str(sequence),
-                    action.lower(): {
-                        "std-ace": {
-                            "ipv4-prefix": network,
-                            "mask": mask
-                        }
-                    }
+                    action.lower(): {"std-ace": {"ipv4-prefix": network, "mask": mask}},
                 }
-            ]
+            ],
         }
     }
 
@@ -168,10 +145,7 @@ async def add_standard_acl_rule(
 
 
 async def apply_acl_to_interface(
-    router_name: str, 
-    interface_name: str, 
-    acl_name: str, 
-    direction: str = "in"
+    router_name: str, interface_name: str, acl_name: str, direction: str = "in"
 ) -> dict:
     """
     Kobler en ACL til et spesifikt grensesnitt (f.eks. GigabitEthernet0/0/1).
@@ -183,7 +157,7 @@ async def apply_acl_to_interface(
     # 1. Parsing av navn: 'GigabitEthernet0/0/1' -> 'GigabitEthernet', '0/0/1'
     interface_type = "".join(filter(str.isalpha, interface_name))
     interface_id = interface_name[len(interface_type) :]
-    
+
     if not interface_type:
         interface_type = "GigabitEthernet"
         interface_id = interface_name
@@ -202,11 +176,11 @@ async def apply_acl_to_interface(
                     direction: {
                         "acl": {
                             "acl-name": int(acl_name) if acl_name.isdigit() else acl_name,
-                            direction: [None]
+                            direction: [None],
                         }
                     }
                 }
-            }
+            },
         }
     }
 
@@ -227,9 +201,7 @@ async def apply_acl_to_interface(
 
 
 async def detach_acl_from_interface(
-    router_name: str, 
-    interface_name: str, 
-    direction: str = "in"
+    router_name: str, interface_name: str, direction: str = "in"
 ) -> dict:
     """
     Fjerner en ACL fra et grensesnitt ved å slette 'in' eller 'out' under access-group.
@@ -239,13 +211,13 @@ async def detach_acl_from_interface(
 
     interface_type = "".join(filter(str.isalpha, interface_name))
     interface_id = interface_name[len(interface_type) :]
-    
+
     if not interface_type:
         interface_type = "GigabitEthernet"
         interface_id = interface_name
 
     encoded_id = encode_intf(interface_id)
-    
+
     # Path targets the specific direction under access-group for deletion
     path = (
         f"https://{router.host}/restconf/data/"
@@ -258,9 +230,12 @@ async def detach_acl_from_interface(
     async with get_client(router) as client:
         try:
             r = await client.delete(path)
-            
+
             if r.status_code == 404:
-                return {"status": "success", "message": f"Ingen ACL var koblet til {direction} på {interface_name}"}
+                return {
+                    "status": "success",
+                    "message": f"Ingen ACL var koblet til {direction} på {interface_name}",
+                }
 
             r.raise_for_status()
             return {
@@ -277,7 +252,7 @@ async def delete_acl(router_name: str, acl_name: str, acl_type: str) -> dict:
     Sletter en ACL fra routeren. Må være løsnet fra grensesnitt først.
     """
     router = get_router(router_name)
-    
+
     # Sti til den spesifikke ACL-instansen
     path = f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/ip/access-list/{acl_type}={acl_name}"
 
@@ -286,7 +261,7 @@ async def delete_acl(router_name: str, acl_name: str, acl_type: str) -> dict:
     async with get_client(router) as client:
         try:
             r = await client.delete(path)
-            
+
             if r.status_code == 409:
                 return {
                     "status": "error",
@@ -313,32 +288,23 @@ async def delete_acl(router_name: str, acl_name: str, acl_type: str) -> dict:
 def rem_acl_tools(mcp):
     mcp.tool(
         description=(
-            "Create a new standard ACL with an initial ACE rule. "
-            "Use when ACL does not yet exist."
+            "Create a new standard ACL with an initial ACE rule. Use when ACL does not yet exist."
         )
     )(create_standard_acl)
+    mcp.tool(description=("Add or update one rule in an existing standard ACL."))(
+        add_standard_acl_rule
+    )
+    mcp.tool(description=("Attach an ACL to an interface direction for traffic filtering."))(
+        apply_acl_to_interface
+    )
     mcp.tool(
-        description=(
-            "Add or update one rule in an existing standard ACL."
-        )
-    )(add_standard_acl_rule)
-    mcp.tool(
-        description=(
-            "Attach an ACL to an interface direction for traffic filtering."
-        )
-    )(apply_acl_to_interface)
-    mcp.tool(
-        description=(
-            "Detach ACL from interface direction to remove packet-filter enforcement."
-        )
+        description=("Detach ACL from interface direction to remove packet-filter enforcement.")
     )(detach_acl_from_interface)
     mcp.tool(
         description=(
             "Delete an ACL object from router configuration after it is detached from interfaces."
         )
     )(delete_acl)
-    mcp.tool(
-        description=(
-            "Create a new extended ACL with an initial any-to-any rule skeleton."
-        )
-    )(create_extended_acl)
+    mcp.tool(description=("Create a new extended ACL with an initial any-to-any rule skeleton."))(
+        create_extended_acl
+    )

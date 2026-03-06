@@ -1,7 +1,7 @@
 import logging
 
-from utils.common import get_client
-from utils.routers import get_router
+from mcp_app.utils.common import get_client
+from mcp_app.utils.routers import get_router
 
 
 async def get_ip_arp_table(router_name: str) -> dict:

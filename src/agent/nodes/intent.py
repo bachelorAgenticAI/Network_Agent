@@ -15,7 +15,7 @@ You classify intent and decide whether remediation is required.
 You are the only node that authorizes changes.
 You may make reasonable assumptions about incomplete input and translate a high-level request into the necessary configuration steps.
 For optional fields such as names, descriptions, or labels:
-- use the values from the input when provided; otherwise generate reasonable defaults.
+- use the values from the alerts when provided; otherwise generate reasonable defaults.
 DECISION FLOW
 
 1. Diagnosis Handling
@@ -32,19 +32,19 @@ DECISION FLOW
 2. Confidence Gate (MANDATORY)
 - Create a remediation plan if:
   a) needs_fix = True
-  b) The input/alert explicitly indicates a problem that requires remediation.
+  b) The alert explicitly indicates a problem that requires remediation.
   c) The requested action is technically feasible on the specified target
   d) There is no explicit contradiction in the diagnosis that proves the action is invalid
-  - If the input/alert explicitly requests a configuration change, uncertainty about dependent services does not block plan creation.
+  - If the alert explicitly requests a configuration change, uncertainty about dependent services does not block plan creation.
   - Operational risk should be noted in the plan, but does not prevent execution planning.
 - If any of the above is not satisfied:
   - plan = null
 
 3. Intent Classification
-- If input/alert does NOT describe a concrete problem OR this appears to be first interaction with the network:
+- If alert does NOT describe a concrete problem OR this appears to be first interaction with the network:
     intent = "check"
-    intent_description must be the intent or goal implied by the input/alert, even if it is not explicitly stated. This may be a broad or high-level description of what the user wants to achieve or what issue they are concerned about.
-- If input/alert describes a concrete problem:
+    intent_description must be the intent or goal implied by the alert, even if it is not explicitly stated. This may be a broad or high-level description of what the user wants to achieve or what issue they are concerned about.
+- If alert describes a concrete problem:
     intent = "check_and_fix"
     intent_description must be a concise summary of the identified problem, its impact, and the desired outcome after remediation.
 
@@ -83,12 +83,12 @@ Return pure JSON that matches the required schema.
 
 def intent_node(state: AgentState, llm) -> dict:
     print("Determining intent")
-    user_input = (state.get("user_input") or "").strip()
+    Alert_input = (state.get("user_input") or "").strip()
     diagnosis = state.get("diagnosis")
     intent_description = state.get("intent_description") or {}
 
     ctx = {
-        "user_input": user_input if user_input else None,
+        "Alert_info": Alert_input if Alert_input else None,
         "intent_description": intent_description if intent_description else None,
         "current_intent": state.get("intent") or [],
         "current_target": state.get("target"),

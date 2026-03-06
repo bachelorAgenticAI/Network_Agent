@@ -1,7 +1,7 @@
 import logging
 
-from utils.common import get_client
-from utils.routers import get_router
+from mcp_app.utils.common import get_client
+from mcp_app.utils.routers import get_router
 
 
 async def get_routing_table(router_name: str) -> dict:
@@ -47,31 +47,6 @@ async def get_routing_table(router_name: str) -> dict:
             return {"error": str(e)}
 
 
-async def get_routes_for_interface(router_name: str, interface: str) -> dict:
-    """
-    Get all routes that use a specific outgoing interface by calling
-    get_routing_table() and filtering the results.
-    """
-    logging.info(f"Filtering routes for interface {interface} on {router_name}")
-
-    try:
-        full_table = await get_routing_table(router_name)
-        if "error" in full_table:
-            return full_table
-
-        routes = full_table.get("routes", [])
-        filtered = [r for r in routes if r.get("outgoing_interface") == interface]
-
-        if not filtered:
-            return {"message": f"No routes found using interface {interface}"}
-
-        return {"routes": filtered}
-
-    except Exception as e:
-        logging.warning(f"Failed to filter routes for interface {interface} on {router_name}: {e}")
-        return {"error": str(e)}
-
-
 def register_router_tools(mcp):
     mcp.tool(
         description=(
@@ -80,10 +55,3 @@ def register_router_tools(mcp):
             "Use for route-path diagnosis before remediation."
         )
     )(get_routing_table)
-
-    mcp.tool(
-        description=(
-            "Filter operational routes to those using a specific outgoing interface. "
-            "Use to verify interface dependency and impact analysis for shutdown/removal changes."
-        )
-    )(get_routes_for_interface)

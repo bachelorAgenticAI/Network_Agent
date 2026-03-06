@@ -1,7 +1,8 @@
 import logging
 
 import asyncssh
-from utils.routers import get_router
+
+from mcp_app.utils.routers import get_router
 
 
 async def ping(router_name: str, destination: str, source: str = None) -> dict:
@@ -48,9 +49,7 @@ async def traceroute(router_name: str, destination: str) -> dict:
 
 def register_ping_tools(mcp):
     mcp.tool(
-        description=(
-            "Run ping from the router CLI to validate end-to-end reachability/latency."
-        )
+        description=("Run ping from the router CLI to validate end-to-end reachability/latency.")
     )(ping)
     mcp.tool(
         description=(
