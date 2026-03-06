@@ -1,5 +1,4 @@
-
-# from utils.common import get_client, encode_intf 
+# from utils.common import get_client, encode_intf
 
 import urllib.parse
 
@@ -10,6 +9,7 @@ HEADERS = {
     "Content-Type": "application/yang-data+json",
 }
 
+
 def get_client(router):
     # Returnerer en prekonfigurert httpx.AsyncClient for en router
     return httpx.AsyncClient(
@@ -18,6 +18,7 @@ def get_client(router):
         headers=HEADERS,
         timeout=10.0,
     )
+
 
 # NB! Bytt function navn til noe uten "intf"
 # Encode special characters for RESTCONF URL's

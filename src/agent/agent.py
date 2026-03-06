@@ -1,183 +1,246 @@
 import asyncio
-import json
-from typing import Annotated, TypedDict
 
 from dotenv import load_dotenv
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
-from langgraph.graph.message import add_messages
-from langgraph.prebuilt import ToolNode, tools_condition
-from utils.json_logger import dump_messages, log_event
-from utils.sanitize_message import sanitize_messages
+from langgraph.prebuilt import ToolNode
+from nodes.assess_verify import assess_verify_node
+from nodes.collect_changes import collect_changes_node
+from nodes.diagnose import diagnose_node
+from nodes.format_network import format_network_node
+from nodes.get_info import get_info_node
+from nodes.ingestion import ingestion
+from nodes.intent import intent_node
+from nodes.remediation import remediation_node
+from nodes.summary import summary_node
+from nodes.verify import verify_node
+from state.types import AgentState
 
 load_dotenv()
 
-PROMPT = """You are a helpful network AI assistant. 
-You get tools from a mcp server.
-You are only allowed to use these tools.
-"""
 
-class AgentState(TypedDict):
-    messages: Annotated[list[BaseMessage], add_messages]
-    user_input: str
+def _route_from_controller(state: AgentState) -> str:
+    v = state.get("verify") or {}
+    # Only retry after verification failure if we're past initial phase
+    if state.get("phase") != "start" and v.get("passed") is False:
+        if int(state.get("attempts", 0)) >= 2:  # set value for retry limit
+            return "summary"
+        return "get_info"
 
-def ingestion(state: AgentState) -> dict:
-    log_event("ingestion", "enter", {"state": state})
+    if state.get("phase") == "start":
+        return "get_info"
 
-    user_text = state.get("user_input", "").strip()
-    if not user_text:
-        return {}
+    d = state.get("diagnosis")  # kan være None
+    if d is None:
+        return "diagnose"
+    if state.get("needs_fix") is True:
+        return "remediation"
 
-    new_messages: list[BaseMessage] = []
+    if state.get("needs_fix") is False:
+        return "summary"
 
-    if not state.get("messages"):
-        new_messages.append(SystemMessage(content=PROMPT))
-    else:
-         repaired = sanitize_messages(state["messages"])
-         if len(repaired) > len(state["messages"]):
-            new_messages.extend(
-                repaired[len(state["messages"]):]
-            )
-
-    new_messages.append(HumanMessage(content=user_text))
-
-    result = {"messages": new_messages}
-
-    log_event(
-        "ingestion",
-        "exit",
-        {"messages": dump_messages(new_messages)}
-    )
-
-    return result
-
-def build_graph(llm, tools):
-    async def agent(state: AgentState) -> dict:
-        log_event(
-            "llm",
-            "enter",
-            {"messages": dump_messages(state["messages"])}
-        )
-        try:
-            response = await llm.ainvoke(state["messages"])
-        except Exception as e:
-            log_event("llm", "error", {"error": str(e)})
-            if "tool_calls must be followed" in str(e):
-                repaired = sanitize_messages(state["messages"])
-                response = await llm.ainvoke(repaired)
-                return {"messages": [response]}
-            raise
-        log_event(
-            "llm",
-            "exit",
-            {"response": dump_messages([response])}
-        )
-
-        return {"messages": [response]}
-
-    tool_node = ToolNode(tools)
-    async def tools_wrapper(state: AgentState):
-        log_event(
-            "tools",
-            "enter",
-            {"messages": dump_messages(state["messages"])}
-        )
-        try:
-            result = await tool_node.ainvoke(state)
-        except Exception as e:
-            log_event("tools", "error", {"error": str(e)})
+    return "summary"
 
 
-            last_msg = state["messages"][-1]
-            tool_calls = getattr(last_msg, "tool_calls", None) or []
-            tool_responses = []
-            for tc in tool_calls:
-                tool_responses.append(
-                    ToolMessage(
-                        tool_call_id=tc["id"],
-                        content=json.dumps(
-                            {
-                                "error": "tool_execution_failed",
-                                "tool": tc.get("name"),
-                                "message": str(e),
-                            }
-                        ),
-                    )
-                )
-            return {"messages": tool_responses}
+def _after_verify_assess(state: AgentState) -> str:
+    v = state.get("verify") or {}
+    if v.get("passed") is True:
+        return "summary"
+    if int(state.get("attempts", 0)) >= 2:  # set value for retry limit 2=3 rounds
+        return "summary"
+    return "intent"
 
-        log_event(
-            "tools",
-            "exit",
-            {"messages": dump_messages(result["messages"])}
-        )
 
-        return result
+def _after_collect_changes(state: AgentState) -> str:
+    if state.get("remediation_done") is True:
+        return "verify"
+    return "remediation"
 
+
+def _inc_attempts(state: AgentState) -> dict:
+    attempts = state.get("attempts")
+    if attempts is None:
+        attempts = 0
+
+    attempts += 1
+    return {"attempts": attempts}
+
+
+def _reset_for_retry(state: AgentState) -> dict:
+    return {
+        "diagnosis": None,
+        "needs_fix": None,
+        "plan": {},
+        "phase": "start",
+        "verify": {}, # reset verify to avoid infinite loop
+        "remediation_step_idx": 0,
+        "remediation_done": False,
+        "info_start_cursor": 0,
+        "verify_start_cursor": 0,
+    }
+
+
+def build_app(
+    llm_intent,
+    llm_info,
+    llm_remediate,
+    llm_verify,
+    tools_info_node,
+    tools_remediate_node,
+    tools_verify_node,
+):
     graph = StateGraph(AgentState)
+
     graph.add_node("ingestion", ingestion)
-    graph.add_node("llm", agent)
-    graph.add_node("tools", tools_wrapper)
+    graph.add_node("intent", lambda s: intent_node(s, llm_intent))
+    graph.add_node("get_info", lambda s: get_info_node(s, llm_info))
+    graph.add_node("format_network", lambda s: format_network_node(s, llm_info))
+    graph.add_node("diagnose", lambda s: diagnose_node(s, llm_info))
+    graph.add_node("remediation", lambda s: remediation_node(s, llm_remediate))
+    graph.add_node("collect_changes", collect_changes_node)
+    graph.add_node("verify", lambda s: verify_node(s, llm_verify))
+    graph.add_node("assess_verify", lambda s: assess_verify_node(s, llm_verify))
+    graph.add_node("summary", lambda s: summary_node(s, llm_verify))
+
+    graph.add_node("tools_info", tools_info_node)
+    graph.add_node("tools_remediate", tools_remediate_node)
+    graph.add_node("tools_verify", tools_verify_node)
+
+    graph.add_node("inc_attempts", _inc_attempts)
+    graph.add_node("reset_for_retry", _reset_for_retry)
 
     graph.add_edge(START, "ingestion")
-    graph.add_edge("ingestion", "llm")
+    graph.add_edge("ingestion", "intent")
 
-    # Hvis LLM ber om verktøy -> tools, ellers -> END
-    graph.add_conditional_edges("llm", tools_condition, {"tools": "tools", "__end__": END})
+    graph.add_conditional_edges(
+        "intent",
+        _route_from_controller,
+        {
+            "get_info": "get_info",
+            "diagnose": "diagnose",
+            "remediation": "remediation",
+            "summary": "summary",
+        },
+    )
 
-    # Etter tools-kjøring, tilbake til llm for å fortsette
-    graph.add_edge("tools", "llm")
+    # Info path
+    graph.add_edge("get_info", "tools_info")
+    graph.add_edge("tools_info", "format_network")
+    graph.add_edge("format_network", "diagnose")
+    graph.add_edge("diagnose", "intent")
 
-    checkpointer = MemorySaver()
-    return graph.compile(checkpointer=checkpointer)
+    # Remediation + verify path
+    graph.add_edge("remediation", "tools_remediate")
+    graph.add_edge("tools_remediate", "collect_changes")
+    graph.add_conditional_edges(
+        "collect_changes",
+        _after_collect_changes,
+        {
+            "remediation": "remediation",
+            "verify": "verify",
+        },
+    )
+    graph.add_edge("verify", "tools_verify")
+    graph.add_edge("tools_verify", "assess_verify")
+
+    graph.add_conditional_edges(
+        "assess_verify",
+        _after_verify_assess,
+        {
+            "summary": "summary",
+            "intent": "inc_attempts",
+        },
+    )
+    graph.add_edge("inc_attempts", "reset_for_retry")
+    graph.add_edge("reset_for_retry", "intent")
+
+    graph.add_edge("summary", END)
+    return graph.compile(checkpointer=MemorySaver())
+
 
 async def main():
+    """
+    client = MultiServerMCPClient({
+        "mcp_intent":     {"transport": "streamable_http", "url": "http://127.0.0.1:8000/mcp/intent"},
+        "mcp_info":       {"transport": "streamable_http", "url": "http://127.0.0.1:8000/mcp/info"},
+        "mcp_remediate":  {"transport": "streamable_http", "url": "http://127.0.0.1:8000/mcp/remediate"},
+        "mcp_verify":     {"transport": "streamable_http", "url": "http://127.0.0.1:8000/mcp/verify"},
+    })
+
+    tools_intent = await client.get_tools(server_name="mcp_intent")
+    tools_info = await client.get_tools(server_name="mcp_info")
+    tools_remediate = await client.get_tools(server_name="mcp_remediate")
+    tools_verify = await client.get_tools(server_name="mcp_verify")
+
+    base = ChatOpenAI(model="gpt-5-mini", temperature=0)
+    llm_intent = base.bind_tools(tools_intent)
+    llm_info = base.bind_tools(tools_info)
+    llm_remediate = base.bind_tools(tools_remediate)
+    llm_verify = base.bind_tools(tools_verify)
+
+    tools_info_node = ToolNode(tools_info)
+    tools_remediate_node = ToolNode(tools_remediate)
+    tools_verify_node = ToolNode(tools_verify)
+
+    app = build_app(
+        llm_intent, llm_info, llm_remediate, llm_verify,
+        tools_info_node, tools_remediate_node, tools_verify_node,
+    )
+    """
     try:
         client = MultiServerMCPClient(
             {
                 "AI_MCP_Router": {
-                "transport": "streamable_http",
-                "url": "http://127.0.0.1:8000/mcp",
+                    "transport": "streamable_http",
+                    "url": "http://127.0.0.1:8000/mcp",
                 },
             }
         )
 
-        tools = await client.get_tools()
-
-    except Exception as e:
-        log_event("mcp", "error", {"error": str(e)})
+        tools_all = await client.get_tools()
+        print("TOOLS:", len(tools_all))
+        print([getattr(t, "name", None) for t in tools_all])
+    except Exception:
         print("Kunne ikke hente tools fra MCP")
         return
 
-    llm = ChatOpenAI(model="gpt-5-mini", temperature=0).bind_tools(tools)
-    app = build_graph(llm, tools)
+    # Quick test: samme tools overalt
+    tools_intent = tools_all
+    tools_info = tools_all
+    tools_remediate = tools_all
+    tools_verify = tools_all
+
+    base = ChatOpenAI(model="gpt-5-mini", temperature=0)
+    llm_intent = base.bind_tools(tools_intent)
+    llm_info = base.bind_tools(tools_info)
+    llm_remediate = base.bind_tools(tools_remediate)
+    llm_verify = base.bind_tools(tools_verify)
+
+    tools_info_node = ToolNode(tools_info)
+    tools_remediate_node = ToolNode(tools_remediate)
+    tools_verify_node = ToolNode(tools_verify)
+
+    app = build_app(
+        llm_intent,
+        llm_info,
+        llm_remediate,
+        llm_verify,
+        tools_info_node,
+        tools_remediate_node,
+        tools_verify_node,
+    )
 
     config = {"configurable": {"thread_id": "chat-1"}}
 
     while True:
-        user_text = input("> ").strip()
-        if user_text.lower() in {"exit", "quit"}:
+        txt = input("> ").strip()
+        if txt.lower() in {"exit", "quit"}:
             break
-        try:
-            state = await app.ainvoke({"user_input": user_text}, config=config)
-        except Exception as e:
-            log_event("graph", "error", {"error": str(e)})
-            print("Graf-feil. Se logger.")
-            continue
+        state = await app.ainvoke({"user_input": txt}, config=config)
+        print(state["messages"][-1].content)
 
-        log_event(
-            "graph",
-            "final_state",
-            {"messages": dump_messages(state["messages"])}
-        )
-
-        # Siste AIMessage etter eventuelle tool-runder
-        last = state["messages"][-1]
-        if isinstance(last, AIMessage):
-            print("Assistant:", last.content)
 
 if __name__ == "__main__":
     try:

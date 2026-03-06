@@ -36,6 +36,7 @@ dist/
 .coverage.*
 htmlcov/
 .tox/
+Inputs.md
 
 # =========================
 # Type checking
@@ -47,6 +48,12 @@ htmlcov/
 # Logs
 # =========================
 *.log
+logger/
+
+# =========================
+# Memory
+# =========================
+memory/
 
 # =========================
 # IDEs / editors
@@ -60,3 +67,8 @@ htmlcov/
 # =========================
 .DS_Store
 Thumbs.db
+
+# =========================
+# Workspace files
+# =========================
+*.code-workspace
