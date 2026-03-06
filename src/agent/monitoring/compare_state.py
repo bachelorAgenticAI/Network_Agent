@@ -9,6 +9,7 @@ MEMORY_DIR = Path(__file__).resolve().parent.parent / "memory"
 STATE_FILE = MEMORY_DIR / "last_state.json"
 ALERT_FILE = MEMORY_DIR / "alerts.json"
 INCIDENT_FILE = MEMORY_DIR / "incidents.json"
+CUSTOM_ALERT_FILE = MEMORY_DIR / "custom_alerts.json"  # <--- manual test alerts
 
 ERROR_THRESHOLD = 50
 DROP_THRESHOLD = 50
@@ -35,11 +36,21 @@ def build_map(state):
     return devices
 
 
+def load_custom_alerts():
+    """Load and clear custom alerts for test cases."""
+    if not CUSTOM_ALERT_FILE.exists():
+        return []
+    alerts = load_json(CUSTOM_ALERT_FILE, default=[])
+    CUSTOM_ALERT_FILE.unlink()  # remove after loading
+    return alerts
+
+
 async def compare():
     old_state = load_json(STATE_FILE, default={"devices": []})
     new_state = await collect_all_devices_interfaces()
 
-    alerts = []
+    # Start with any custom alerts
+    alerts = load_custom_alerts()
 
     old_map = build_map(old_state)
     new_map = build_map(new_state)
@@ -62,7 +73,6 @@ async def compare():
                     "interface": name,
                     "new_oper_state": new_intf.get("oper_state"),
                 })
-                # Create incident to ignore first appearance alert
                 updated_incidents[key] = {"active": True}
                 continue
 
@@ -72,7 +82,6 @@ async def compare():
             # ===== Oper State Change =====
             if old_oper != new_oper:
                 if incident:
-                    # Ignore alert, then remove incident immediately
                     updated_incidents.pop(key, None)
                 else:
                     alerts.append({
@@ -102,7 +111,7 @@ async def compare():
                         "errors_since_last_check": delta,
                     })
 
-    # Save current state and updated incidents
+    # Save current state, incidents, and all alerts
     save_json(STATE_FILE, new_state)
     save_json(INCIDENT_FILE, updated_incidents)
     save_json(ALERT_FILE, alerts)
