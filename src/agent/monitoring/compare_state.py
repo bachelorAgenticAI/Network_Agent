@@ -5,12 +5,6 @@ from pathlib import Path
 
 from agent.monitoring.get_quick_state import collect_all_devices_interfaces
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)-7s | %(message)s",
-    datefmt="%H:%M:%S",
-)
-
 MEMORY_DIR = Path(__file__).resolve().parent.parent / "memory"
 STATE_FILE = MEMORY_DIR / "last_state.json"
 ALERT_FILE = MEMORY_DIR / "alerts.json"
@@ -125,7 +119,7 @@ async def compare():
                                 "device": device,
                                 "interface": name,
                                 "metric": metric,
-                                "delta": delta,
+                                "errors_since_last_check": delta,
                             }
                         )
 
