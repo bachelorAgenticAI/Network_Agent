@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+<<<<<<< HEAD
 from langchain_core.messages import AIMessage, HumanMessage
 from state.types import AgentState
+=======
+from langchain_core.messages import HumanMessage
+
+from agent.state.types import AgentState
+>>>>>>> feature/monitoring
 
 MAX_MESSAGES = 30
 

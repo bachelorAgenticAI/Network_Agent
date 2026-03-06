@@ -1,8 +1,8 @@
 # interface_tools.py
 import logging
 
-from utils.common import encode_intf, get_client
-from utils.routers import get_router
+from mcp_app.utils.common import encode_intf, get_client
+from mcp_app.utils.routers import get_router
 
 
 async def enable_interface(router_name: str, interface_name: str) -> dict:

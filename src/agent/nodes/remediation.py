@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 
 from langchain_core.messages import SystemMessage
-from state.types import AgentState
+
+from agent.state.types import AgentState
 
 SYSTEM = """You are a network remediation agent.
 You receive a remediation PLAN consisting of ordered change-steps. Your job is to execute the PLAN fully.

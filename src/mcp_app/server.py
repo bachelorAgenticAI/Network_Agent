@@ -2,16 +2,17 @@
 import logging
 
 from mcp.server.fastmcp import FastMCP
-from tools.arp_info import register_arp_tools
-from tools.device_info import register_config_tools
-from tools.interface_router import register_interface_tools
-from tools.ospf import register_ospf_tools
-from tools.ping import register_ping_tools
-from tools.rem_acl import rem_acl_tools
-from tools.rem_dhcp import rem_dhcp_tools
-from tools.rem_interface import rem_interface_tools
-from tools.rem_ospf import rem_ospf_tools
-from tools.rem_routing import rem_routing_tools
+
+from mcp_app.tools.arp_info import register_arp_tools
+from mcp_app.tools.device_info import register_config_tools
+from mcp_app.tools.interface_router import register_interface_tools
+from mcp_app.tools.ospf import register_ospf_tools
+from mcp_app.tools.ping import register_ping_tools
+from mcp_app.tools.rem_acl import rem_acl_tools
+from mcp_app.tools.rem_dhcp import rem_dhcp_tools
+from mcp_app.tools.rem_interface import rem_interface_tools
+from mcp_app.tools.rem_ospf import rem_ospf_tools
+from mcp_app.tools.rem_routing import rem_routing_tools
 
 # ----------------- LOGGING -----------------
 logging.basicConfig(

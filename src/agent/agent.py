@@ -6,17 +6,19 @@ from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
-from nodes.assess_verify import assess_verify_node
-from nodes.collect_changes import collect_changes_node
-from nodes.diagnose import diagnose_node
-from nodes.format_network import format_network_node
-from nodes.get_info import get_info_node
-from nodes.ingestion import ingestion
-from nodes.intent import intent_node
-from nodes.remediation import remediation_node
-from nodes.summary import summary_node
-from nodes.verify import verify_node
-from state.types import AgentState
+
+from agent.monitoring.compare_state import compare
+from agent.nodes.assess_verify import assess_verify_node
+from agent.nodes.collect_changes import collect_changes_node
+from agent.nodes.diagnose import diagnose_node
+from agent.nodes.format_network import format_network_node
+from agent.nodes.get_info import get_info_node
+from agent.nodes.ingestion import ingestion
+from agent.nodes.intent import intent_node
+from agent.nodes.remediation import remediation_node
+from agent.nodes.summary import summary_node
+from agent.nodes.verify import verify_node
+from agent.state.types import AgentState
 
 load_dotenv()
 
@@ -232,18 +234,36 @@ async def main():
         tools_verify_node,
     )
 
-    config = {"configurable": {"thread_id": "chat-1"}}
+    config = {"configurable": {"thread_id": "monitor-driven"}}
+    thread_id = 0
 
     while True:
-        txt = input("> ").strip()
-        if txt.lower() in {"exit", "quit"}:
+        try:
+            print("\n[Monitoring] Running check...")
+
+            alerts = await compare()
+
+            if alerts:
+                thread_id += 1
+                config["configurable"]["thread_id"] = f"alert-{thread_id}"
+
+                state = await app.ainvoke({"user_input": str(alerts)}, config=config)
+
+                print(state["messages"][-1].content)
+
+            # Ensure monitoring never runs more often than every 5 minutes
+            await asyncio.sleep(10)
+
+        except KeyboardInterrupt:
             break
-        state = await app.ainvoke({"user_input": txt}, config=config)
-        print(state["messages"][-1].content)
+
+        except Exception as e:
+            print(f"Error: {e}")
+            await asyncio.sleep(300)
 
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("Server stoppet av bruker")
+        print("Stopped")

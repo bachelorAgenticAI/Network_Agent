@@ -32,44 +32,13 @@ Network Agent is designed as an **autonomous control-loop system** that:
 
 Copy the example environment file and configure required variables:
 
-```bash
-cp .env.example .env
-```
+## Install dependencies 
+- pip install e .
 
-Edit .env and provide the necessary configuration values.
+## Run Agent
 
----
+python3 -m agent.agent
 
-## Installation
+## Run Mcp server
 
-All commands are executed from the project root directory.
-
-1. Create Virtual Environment
-### Windows (PowerShell)
-```
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-```
-### Linux / macOS
-```
-python3 -m venv .venv
-source .venv/bin/activate
-```
-## 2. Install Dependencies
-```
-pip install .
-```
-This installs the project and all required dependencies.
-
----
-
-## Running the Agent
-
-Start the interactive agent:
-```
-python3 src/agent/agent.py
-```
-Start the MCP server:
-```
-python3 src/mc/server.py
-```
+python3 -m mcp_app.server

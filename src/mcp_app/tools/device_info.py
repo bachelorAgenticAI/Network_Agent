@@ -1,8 +1,9 @@
 # device_info.py
 import logging
 
-from utils.common import get_client
-from utils.routers import get_router
+# For when mcp is run as a server (relative imports)
+from mcp_app.utils.common import get_client
+from mcp_app.utils.routers import get_router
 
 
 async def get_running_config(router_name: str) -> dict:
