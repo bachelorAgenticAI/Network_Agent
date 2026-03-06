@@ -35,29 +35,23 @@ async def add_static_route(router_name: str, network: str, mask: str, next_hop: 
             return {"status": "error", "message": str(e)}
 
 
-async def delete_static_route(router_name: str) -> dict:
-    """
-    Delete a specific static route from a Cisco IOS-XE router using DELETE.
-    Targets the specific route: 172.16.100.0/24 via 10.0.0.2
-    """
+async def delete_static_route(router_name: str, network: str, mask: str) -> dict:
     router = get_router(router_name)
-    logging.info(f"Deleting static route 172.16.100.0/24 on {router.name}")
+    logging.info(f"Deleting static route {network}/{mask} on {router.name}")
 
-    # Path targets the specific route list item using prefix and mask as keys
+    # Path targets the specific route list item using prefix and mask
     url = (
         f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/ip/route/"
-        f"ip-route-interface-forwarding-list=172.16.100.0,255.255.255.0"
+        f"ip-route-interface-forwarding-list={network},{mask}"
     )
 
     async with get_client(router) as client:
         try:
-            # Perform the DELETE request
             r = await client.delete(url)
             r.raise_for_status()
-
             return {
                 "status": "success",
-                "message": f"Static route 172.16.100.0/24 deleted from {router.name}",
+                "message": f"Static route {network}/{mask} deleted from {router.name}",
             }
         except Exception as e:
             logging.error(f"Failed to delete static route on {router.name}: {e}")
@@ -164,11 +158,9 @@ def rem_routing_tools(mcp):
         add_static_route
     )
 
-    mcp.tool(
-        description=(
-            "Delete the hardcoded static route 172.16.100.0/24 used by this implementation."
-        )
-    )(delete_static_route)
+    mcp.tool(description=("Delete a specific static IPv4 route by network and mask."))(
+        delete_static_route
+    )
 
     mcp.tool(description=("Create default route (0.0.0.0/0) towards specified next-hop."))(
         configure_default_route
