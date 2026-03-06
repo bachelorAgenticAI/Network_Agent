@@ -13,7 +13,7 @@ ROLE
 You classify intent and decide whether remediation is required.
 You are the only node that authorizes changes.
 You may make reasonable assumptions about incomplete input and translate a high-level request into the necessary configuration steps.
-For optional fields such as names, descriptions, or labels: 
+For optional fields such as names, descriptions, or labels:
 - use the values from the input when provided; otherwise generate reasonable defaults.
 DECISION FLOW
 
@@ -29,9 +29,9 @@ DECISION FLOW
       needs_fix = True
 
 2. Confidence Gate (MANDATORY)
-- You may create a remediation plan if:
+- Create a remediation plan if:
   a) needs_fix = True
-  b) The input/alert explicitly indicates a desire for fixing/remediation
+  b) The input/alert explicitly indicates a problem that requires remediation.
   c) The requested action is technically feasible on the specified target
   d) There is no explicit contradiction in the diagnosis that proves the action is invalid
   - If the input/alert explicitly requests a configuration change, uncertainty about dependent services does not block plan creation.
@@ -58,6 +58,7 @@ PLAN RULES (only if plan is created)
 - Do not include multiple actions in one step. If you need 3 changes, create 3 steps.
 - Each step must include device: "router<number>" and full interface names where applicable (e.g. "GigabitEthernet0/0/1" not "Gi0/0/1").
 - Each step must specify exactly one action from the remediation tools supported actions.
+- `action` must exactly match an available remediation tool name.
 - Do NOT include:
   - approval/authorization language
   - confirmations
@@ -68,22 +69,19 @@ PLAN RULES (only if plan is created)
   - documentation/audit steps
   - verification steps
 - If required information is missing:
-  - Do NOT guess.
+  - Make reasonable assumptions and still produce a remediation plan.
   - Place missing details in diagnosis.missing_info.
-  - Set plan = null if missing information prevents safe remediation.
   - If new diagnosis remains consistent with previous diagnosis, you may reuse previously failed plan steps that are still relevant.
+- If needs_fix = True, plan_steps must not be empty.
 - Do not create plans for minor or unrelated findings in diagnosis.
 
 OUTPUT
 Return pure JSON that matches the required schema.
 """
 
-# need to add state.get types to properly log state in this node
-
 
 def intent_node(state: AgentState, llm) -> dict:
     print("Determining intent")
-    # Uses only the latest user input
     user_input = (state.get("user_input") or "").strip()
     diagnosis = state.get("diagnosis")
     intent_description = state.get("intent_description") or {}
@@ -101,7 +99,6 @@ def intent_node(state: AgentState, llm) -> dict:
     log_node_enter("intent", ctx)
 
     msg = SystemMessage(content=SYSTEM + "\n\nSTATE:\n" + json.dumps(ctx, ensure_ascii=False))
-
     out: IntentOut = llm.with_structured_output(IntentOut).invoke([msg])
 
     log_schema_output("intent", schema=IntentOut, output=out, state=state)
@@ -112,10 +109,14 @@ def intent_node(state: AgentState, llm) -> dict:
         "intent_description": out.intent_description,
     }
 
-    # Only set needs_fix/plan after diagnosis exists
     if diagnosis is not None:
-        # Tom diagnose => ingen funn => ikke noe å fikse
-        if not (diagnosis.get("root_causes") or diagnosis.get("risks") or diagnosis.get("missing_info")):
+        has_findings = bool(
+            (diagnosis.get("root_causes") or [])
+            or (diagnosis.get("risks") or [])
+            or (diagnosis.get("missing_info") or [])
+        )
+
+        if not has_findings:
             updates["needs_fix"] = False
             updates["plan"] = {}
             updates["phase"] = "have_diagnosis"
@@ -123,16 +124,16 @@ def intent_node(state: AgentState, llm) -> dict:
             print("attempts in assess_verify:", state.get("attempts"))
             return updates
 
-        if out.needs_fix is not None:
-            updates["needs_fix"] = bool(out.needs_fix)
-        plan_dict = out.plan.model_dump()
-        if plan_dict:
-            print("Added plan to state")
-            updates["plan"] = plan_dict
-            print(plan_dict)
+        updates["needs_fix"] = bool(out.needs_fix) if out.needs_fix is not None else True
+
+        if updates["needs_fix"]:
+            updates["plan"] = out.plan.model_dump()
+            print("Plan:", updates["plan"])
+        else:
+            updates["plan"] = {}
+
         updates["phase"] = "have_diagnosis"
 
-    # Log node exit with the updates and a preview of the new state
     log_node_exit("intent", updates)
     print("attempts in assess_verify:", state.get("attempts"))
     return updates

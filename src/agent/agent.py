@@ -35,12 +35,11 @@ def _route_from_controller(state: AgentState) -> str:
     d = state.get("diagnosis")  # kan være None
     if d is None:
         return "diagnose"
+    if state.get("needs_fix") is True:
+        return "remediation"
 
     if state.get("needs_fix") is False:
         return "summary"
-
-    if state.get("intent") == "check_and_fix":
-        return "remediation"
 
     return "summary"
 
@@ -72,7 +71,7 @@ def _inc_attempts(state: AgentState) -> dict:
 def _reset_for_retry(state: AgentState) -> dict:
     return {
         "diagnosis": None,
-        "needs_fix": False,
+        "needs_fix": None,
         "plan": {},
         "phase": "start",
         "verify": {}, # reset verify to avoid infinite loop
