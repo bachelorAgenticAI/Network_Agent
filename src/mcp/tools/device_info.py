@@ -34,4 +34,9 @@ async def get_running_config(router_name: str) -> dict:
 
 
 def register_config_tools(mcp):
-    mcp.tool(description="Get the running configuration of a router")(get_running_config)
+    mcp.tool(
+        description=(
+            "Fetch key sections of the running configuration for troubleshooting and baseline checks "
+            "(hostname, interfaces, routes, ACLs, users, license/UDI)."
+        )
+    )(get_running_config)
