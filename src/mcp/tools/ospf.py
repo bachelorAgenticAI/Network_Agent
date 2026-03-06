@@ -116,4 +116,9 @@ async def get_ospf(router_name: str) -> dict:
 
 
 def register_ospf_tools(mcp):
-    mcp.tool(description="Get full OSPF info with interfaces and neighbors")(get_ospf)
+    mcp.tool(
+        description=(
+            "Collect OSPF operational view with interface state, area/process context, cost, and mapped neighbors. "
+            "Use to diagnose adjacency formation and area/interface mismatches."
+        )
+    )(get_ospf)

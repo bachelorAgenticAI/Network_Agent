@@ -47,5 +47,13 @@ async def traceroute(router_name: str, destination: str) -> dict:
 
 
 def register_ping_tools(mcp):
-    mcp.tool(description="Ping a destination from the router")(ping)
-    mcp.tool(description="Traceroute to a destination from the router")(traceroute)
+    mcp.tool(
+        description=(
+            "Run ping from the router CLI to validate end-to-end reachability/latency."
+        )
+    )(ping)
+    mcp.tool(
+        description=(
+            "Run traceroute from the router CLI to identify forwarding path and hop-by-hop loss."
+        )
+    )(traceroute)

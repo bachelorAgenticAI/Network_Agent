@@ -47,6 +47,8 @@ async def get_interface_status(router_name: str, interface_name: str) -> dict:
 
 
 def register_interface_tools(mcp):
-    mcp.tool(description="Get operational status and counters for a single interface")(
-        get_interface_status
-    )
+    mcp.tool(
+        description=(
+            "Retrieve operational state and error counters for one interface to diagnose link and traffic issues."
+        )
+    )(get_interface_status)

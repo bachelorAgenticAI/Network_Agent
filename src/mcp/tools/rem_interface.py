@@ -216,10 +216,24 @@ async def set_interface_description(
 
 
 def rem_interface_tools(mcp):
-    mcp.tool(description="Set interface state to up or down")(set_interface_state)
+    mcp.tool(
+        description=(
+            "Administratively enable or disable an interface. "
+            "Use to remediate link state issues or isolate faults."
+        )
+    )(set_interface_state)
 
-    mcp.tool(description="Configure an interface with an IPv4 address")(configure_interface)
+    mcp.tool(
+        description=("Configure primary IPv4 address on an interface.")
+    )(configure_interface)
 
-    mcp.tool(description="Remove a specific interface from a Cisco router")(remove_interface)
+    mcp.tool(
+        description=(
+            "Delete an interface configuration stanza from the router. "
+            "Use with caution as dependent services may break."
+        )
+    )(remove_interface)
 
-    mcp.tool(description="Set interface description on a router")(set_interface_description)
+    mcp.tool(
+        description=("Set interface description text for documentation and operational clarity.")
+    )(set_interface_description)

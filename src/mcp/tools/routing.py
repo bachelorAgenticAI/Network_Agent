@@ -73,8 +73,17 @@ async def get_routes_for_interface(router_name: str, interface: str) -> dict:
 
 
 def register_router_tools(mcp):
-    mcp.tool(description="Get routing table information from a router")(get_routing_table)
+    mcp.tool(
+        description=(
+            "Fetch simplified operational routing table entries across VRFs "
+            "(destination, protocol, next-hop, outgoing interface, metric, preference). "
+            "Use for route-path diagnosis before remediation."
+        )
+    )(get_routing_table)
 
-    mcp.tool(description="Get all routes using a specific outgoing interface")(
-        get_routes_for_interface
-    )
+    mcp.tool(
+        description=(
+            "Filter operational routes to those using a specific outgoing interface. "
+            "Use to verify interface dependency and impact analysis for shutdown/removal changes."
+        )
+    )(get_routes_for_interface)

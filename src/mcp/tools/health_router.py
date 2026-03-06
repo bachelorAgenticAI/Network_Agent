@@ -53,4 +53,9 @@ async def get_system_health(router_name: str) -> dict:
 
 
 def register_health_tools(mcp):
-    mcp.tool(description="Get full CPU and memory health report")(get_system_health)
+    mcp.tool(
+        description=(
+            "Collect router health telemetry for diagnosis by combining CPU and memory operational data. "
+            "Use before remediation to confirm load/resource issues."
+        )
+    )(get_system_health)

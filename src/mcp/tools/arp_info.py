@@ -40,4 +40,9 @@ async def get_ip_arp_table(router_name: str) -> dict:
 
 
 def register_arp_tools(mcp):
-    mcp.tool(description="Get the ARP table (IP to MAC mappings)")(get_ip_arp_table)
+    mcp.tool(
+        description=(
+            "Retrieve the router ARP table for diagnostics (IP-to-MAC mappings per VRF). "
+            "Use this to validate L2/L3 adjacency and stale/incorrect ARP entries."
+        )
+    )(get_ip_arp_table)
