@@ -18,4 +18,12 @@ An autonomous AI agent for network management
 - source .venv/bin/activate
 
 ## Install dependencies 
-- pip install .
+- pip install e .
+
+## Run Agent
+
+python3 -m agent.agent
+
+## Run Mcp server
+
+python3 -m mcp_app.server

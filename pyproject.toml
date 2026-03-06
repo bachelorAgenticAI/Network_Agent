@@ -14,7 +14,7 @@ dependencies = [
     "python-dotenv==1.0.1",
     "langchain-openai==1.1.7",
     "langchain-mcp-adapters==0.2.1",
-    "mcp==1.24.0",
+    "mcp==1.23.3",
     "fastmcp==2.2.0",
     "ruff",
 ]
@@ -22,6 +22,12 @@ dependencies = [
 [build-system]
 requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.ruff]
 line-length = 100

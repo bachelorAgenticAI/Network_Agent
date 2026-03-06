@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 
 from langchain_core.messages import SystemMessage
-from state.types import AgentState
+
+from agent.state.types import AgentState
 
 SYSTEM = """You are a verification agent.
 Run relevant verify-tools based on the diagnosis, plan, and executed changes.

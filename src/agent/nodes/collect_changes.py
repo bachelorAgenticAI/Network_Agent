@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from langchain_core.messages import AIMessage, ToolMessage
-from state.types import AgentState
+
+from agent.state.types import AgentState
 
 
 def collect_changes_node(state: AgentState) -> dict:

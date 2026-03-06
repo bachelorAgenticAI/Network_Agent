@@ -4,8 +4,9 @@ from __future__ import annotations
 import json
 
 from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
-from state.schemas import Diagnosis
-from state.types import AgentState
+
+from agent.state.schemas import Diagnosis
+from agent.state.types import AgentState
 
 SYSTEM = """You are a network diagnostician.
 Use observations from tool responses (ToolMessage) and the existing topology to create a structured diagnosis.

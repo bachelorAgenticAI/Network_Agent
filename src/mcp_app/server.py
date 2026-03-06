@@ -2,12 +2,13 @@
 import logging
 
 from mcp.server.fastmcp import FastMCP
-from tools.device_info import register_config_tools
-from tools.device_status import register_tools as register_device_status_tools
-from tools.health_router import register_health_tools
-from tools.interface_router import register_interface_tools
-from tools.rem_interface import rem_interface_tools
-from tools.router_tools import register_tools as register_router_tools
+
+from mcp_app.tools.device_info import register_config_tools
+from mcp_app.tools.device_status import register_tools as register_device_status_tools
+from mcp_app.tools.health_router import register_health_tools
+from mcp_app.tools.interface_router import register_interface_tools
+from mcp_app.tools.rem_interface import rem_interface_tools
+from mcp_app.tools.router_tools import register_tools as register_router_tools
 
 # ----------------- LOGGING -----------------
 logging.basicConfig(
