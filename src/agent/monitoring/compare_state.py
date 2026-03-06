@@ -5,7 +5,11 @@ from pathlib import Path
 
 from agent.monitoring.get_quick_state import collect_all_devices_interfaces
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-7s | %(message)s",
+    datefmt="%H:%M:%S",
+)
 
 MEMORY_DIR = Path(__file__).resolve().parent.parent / "memory"
 STATE_FILE = MEMORY_DIR / "last_state.json"
@@ -130,9 +134,37 @@ async def compare():
     save_json(INCIDENT_FILE, updated_incidents)
     save_json(ALERT_FILE, alerts)
 
+    print_alerts(alerts)
     return alerts
 
 
+def print_alerts(alerts):
+    if not alerts:
+        print("\n=== ALERT SUMMARY ===")
+        print("No alerts detected\n")
+        return
+
+    print("\n=== ALERT SUMMARY ===\n")
+
+    header = f"{'DEVICE':20} {'INTERFACE':20} {'TYPE':20} DETAILS"
+    print(header)
+    print("-" * len(header))
+
+    for a in alerts:
+        device = a.get("device", "-")
+        interface = a.get("interface", "-")
+        alert_type = a.get("type", "-")
+
+        details = ", ".join(
+            f"{k}={v}" for k, v in a.items() if k not in ("device", "interface", "type")
+        )
+
+        print(f"{device:20} {interface:20} {alert_type:20} {details}")
+
+    print()
+
+
+# Only used for testing - in production this script would be called by compare() from agent.py
 if __name__ == "__main__":
     alerts = asyncio.run(compare())
     if alerts:
