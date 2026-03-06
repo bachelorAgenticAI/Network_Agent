@@ -51,55 +51,38 @@ async def compare():
 
         for name, new_intf in interfaces.items():
             old_intf = old_interfaces.get(name)
-
             key = f"{device}:{name}"
-            new_state_val = new_intf.get("oper_state")
-            incident = incidents.get(key)
+            incident = updated_incidents.get(key)
 
             # ===== New Interface Detection =====
             if not old_intf:
-                alerts.append(
-                    {
-                        "type": "interface_new",
-                        "device": device,
-                        "interface": name,
-                        "new_state": new_state_val,
-                    }
-                )
+                alerts.append({
+                    "type": "interface_new",
+                    "device": device,
+                    "interface": name,
+                    "new_oper_state": new_intf.get("oper_state"),
+                })
+                # Create incident to ignore first appearance alert
+                updated_incidents[key] = {"active": True}
                 continue
 
-            old_state_val = old_intf.get("oper_state")
+            old_oper = old_intf.get("oper_state")
+            new_oper = new_intf.get("oper_state")
 
-            # ===== Interface Down Detection =====
-            if old_state_val == "up" and new_state_val == "down":
-                if not incident or not incident.get("active"):
-                    alerts.append(
-                        {
-                            "type": "interface_down",
-                            "device": device,
-                            "interface": name,
-                            "old_state": old_state_val,
-                            "new_state": new_state_val,
-                        }
-                    )
-                    updated_incidents[key] = {"active": True}
-
-            # ===== Interface Up =====
-            elif old_state_val == "down" and new_state_val == "up":
-                # Recovery: clear incident, no alert
-                if incident and incident.get("active"):
-                    updated_incidents[key]["active"] = False
+            # ===== Oper State Change =====
+            if old_oper != new_oper:
+                if incident:
+                    # Ignore alert, then remove incident immediately
+                    updated_incidents.pop(key, None)
                 else:
-                    # Unexpected up event
-                    alerts.append(
-                        {
-                            "type": "interface_up",
-                            "device": device,
-                            "interface": name,
-                            "old_state": old_state_val,
-                            "new_state": new_state_val,
-                        }
-                    )
+                    alerts.append({
+                        "type": "oper_state_change",
+                        "device": device,
+                        "interface": name,
+                        "old_state": old_oper,
+                        "new_state": new_oper,
+                    })
+                    updated_incidents[key] = {"active": True}
 
             # ===== Counter Thresholds =====
             for metric, threshold in [
@@ -107,23 +90,19 @@ async def compare():
                 ("output_errors", ERROR_THRESHOLD),
                 ("drops", DROP_THRESHOLD),
             ]:
-                old_val = old_intf.get(metric, 0) or 0
-                new_val = new_intf.get(metric, 0) or 0
+                old_val = old_intf.get(metric) or 0
+                new_val = new_intf.get(metric) or 0
+                delta = max(0, new_val - old_val)
+                if delta >= threshold:
+                    alerts.append({
+                        "type": "threshold_exceeded",
+                        "device": device,
+                        "interface": name,
+                        "metric": metric,
+                        "errors_since_last_check": delta,
+                    })
 
-                if new_val >= old_val:
-                    delta = new_val - old_val
-                    if delta >= threshold:
-                        alerts.append(
-                            {
-                                "type": "threshold_exceeded",
-                                "device": device,
-                                "interface": name,
-                                "metric": metric,
-                                "errors_since_last_check": delta,
-                            }
-                        )
-
-    # Save current state and incidents
+    # Save current state and updated incidents
     save_json(STATE_FILE, new_state)
     save_json(INCIDENT_FILE, updated_incidents)
     save_json(ALERT_FILE, alerts)
@@ -140,7 +119,7 @@ def print_alerts(alerts):
 
     print("\n=== ALERT SUMMARY ===\n")
 
-    header = f"{'DEVICE':20} {'INTERFACE':20} {'TYPE':20} DETAILS"
+    header = f"{'DEVICE':20} {'INTERFACE':20} {'TYPE':25} DETAILS"
     print(header)
     print("-" * len(header))
 
@@ -148,17 +127,14 @@ def print_alerts(alerts):
         device = a.get("device", "-")
         interface = a.get("interface", "-")
         alert_type = a.get("type", "-")
-
         details = ", ".join(
             f"{k}={v}" for k, v in a.items() if k not in ("device", "interface", "type")
         )
-
-        print(f"{device:20} {interface:20} {alert_type:20} {details}")
+        print(f"{device:20} {interface:20} {alert_type:25} {details}")
 
     print()
 
 
-# Only used for testing - in production this script would be called by compare() from agent.py
 if __name__ == "__main__":
     alerts = asyncio.run(compare())
     if alerts:
