@@ -10,7 +10,7 @@ The Network Agent analyzes network state, identifies issues based on intent-driv
 
 Network Agent is designed as an **autonomous control-loop system** that:
 
-- Interprets operator intent
+- Monitior network 
 - Collects live network data via tools
 - Produces scoped diagnoses
 - Generates executable remediation plans
@@ -35,10 +35,12 @@ Copy the example environment file and configure required variables:
 ## Install dependencies 
 - pip install e .
 
-## Run Agent
+## Run from root folder
+
+## Agent
 
 python3 -m agent.agent
 
-## Run Mcp server
+## Mcp server
 
 python3 -m mcp_app.server

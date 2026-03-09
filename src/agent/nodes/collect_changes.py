@@ -1,3 +1,5 @@
+"""Collect remediation tool call results and advance remediation step progress."""
+
 from __future__ import annotations
 
 from langchain_core.messages import AIMessage, ToolMessage
@@ -6,8 +8,10 @@ from agent.state.types import AgentState
 from agent.utils.logger import log_node_enter, log_node_exit
 
 
+# This node collects the results of tool calls made during remediation execution, pairs them with the corresponding tool call metadata, and updates the state with a clean list of changes.
 def collect_changes_node(state: AgentState) -> dict:
     print("Collecting changes from recent tool calls...")
+    # Logger
     log_node_enter(
         "collect_changes",
         {
@@ -19,12 +23,14 @@ def collect_changes_node(state: AgentState) -> dict:
 
     messages = state.get("messages") or []
 
+    # Read only messages generated during the latest remediation execution window.
     start = int(state.get("remedy_start_cursor") or 0)
     window = messages[start:]
     plan_steps = (state.get("plan") or {}).get("plan_steps") or []
     total_steps = len(plan_steps)
     current_idx = int(state.get("remediation_step_idx") or 0)
 
+    # Map tool_call_id -> metadata from AI tool call requests.
     calls_by_id = {}
     for m in window:
         if isinstance(m, AIMessage):
@@ -37,6 +43,7 @@ def collect_changes_node(state: AgentState) -> dict:
                     "args": c.get("args") or {},
                 }
 
+    # Pair tool outputs with the tool metadata to persist a clean change log.
     new_changes = []
     for m in window:
         if isinstance(m, ToolMessage):
@@ -55,12 +62,11 @@ def collect_changes_node(state: AgentState) -> dict:
     changes = (state.get("changes") or []) + new_changes
     next_idx = current_idx + (1 if total_steps > current_idx else 0)
     remediation_done = next_idx >= total_steps
-    print(changes)
     out = {
         "changes": changes,
         "remedy_start_cursor": len(messages),
         "remediation_step_idx": min(next_idx, total_steps),
         "remediation_done": remediation_done,
     }
-    log_node_exit("collect_changes", out)
+    log_node_exit("collect_changes", out) # Logger
     return out

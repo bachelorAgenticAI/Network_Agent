@@ -1,4 +1,5 @@
-# diagnose_node.py
+"""Create a structured diagnosis from the latest tool observations."""
+
 from __future__ import annotations
 
 import json
@@ -40,22 +41,25 @@ Return ONLY a single JSON object with this schema:
 If no root cause can be supported, set root_causes to [] and populate missing_info with the minimum questions needed.
 """
 
-
+# Safely convert a value to a JSON string and limit its size for prompts.
 def _is_tool_related(m):
+    # Keep only messages tied to tool execution (tool calls and tool outputs).
     return isinstance(m, ToolMessage) or (
         isinstance(m, AIMessage) and (getattr(m, "tool_calls", None) or [])
     )
 
-
+# This node gather tool-related observations from the most recent info-gathering round and generates a structured diagnosis.
 def diagnose_node(state: AgentState, llm) -> dict:
     print("Diagnosing...")
     messages = state.get("messages") or []
 
+    # Diagnose primarily from the most recent info-gathering round.
     info_start = int(state.get("info_start_cursor") or 0)
     recent_window = messages[info_start:]
 
     recent_tool_msgs = [m for m in recent_window if _is_tool_related(m)][-30:]
     if not recent_tool_msgs:
+        # Fallback if cursor-based window is empty.
         recent_tool_msgs = [m for m in messages if _is_tool_related(m)][-30:]
 
     observations = []
@@ -78,8 +82,7 @@ def diagnose_node(state: AgentState, llm) -> dict:
         "observations": observations,
         "previous_changes": state.get("changes") or [],
     }
-    log_node_enter("diagnose", ctx)
-    print("Diagnose node description:", state.get("intent_description"))
+    log_node_enter("diagnose", ctx) # Logger
     msg = SystemMessage(content=SYSTEM + "\n\nCTX:\n" + json.dumps(ctx, ensure_ascii=False))
     diag: Diagnosis = llm.with_structured_output(Diagnosis).invoke([msg])
 
@@ -87,6 +90,5 @@ def diagnose_node(state: AgentState, llm) -> dict:
         "observations": observations,
         "diagnosis": diag.model_dump(),
     }
-    print(patch)
-    log_node_exit("diagnose", patch)
+    log_node_exit("diagnose", patch) # Logger
     return patch

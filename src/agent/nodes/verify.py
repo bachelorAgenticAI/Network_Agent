@@ -1,3 +1,5 @@
+"""Run post-remediation verification tools for the diagnosed problem scope."""
+
 from __future__ import annotations
 
 import json
@@ -20,9 +22,10 @@ Rules:
 - Prefer direct symptom checks over broad status dumps.
 """
 
-
+# This node runs verification tools after remediation to check if the original problem is resolved and to detect any obvious side effects.
 def verify_node(state: AgentState, llm) -> dict:
     print("Running verification tools...")
+    # Record cursor so assess_verify can focus on this verification round.
     verify_start_cursor = len(state.get("messages") or [])
     ctx = {
         "target": state.get("target"),
@@ -31,9 +34,9 @@ def verify_node(state: AgentState, llm) -> dict:
         "plan": state.get("plan") or {},
         "changes_tail": (state.get("changes") or [])[-25:],
     }
-    log_node_enter("verify", ctx)
+    log_node_enter("verify", ctx) # Logger
     msg = SystemMessage(content=SYSTEM + "\n\nCTX:\n" + json.dumps(ctx, ensure_ascii=False))
     ai = llm.invoke([msg])  # may include tool_calls
     out = {"messages": [ai], "phase": "verified", "verify_start_cursor": verify_start_cursor}
-    log_node_exit("verify", out)
+    log_node_exit("verify", out) # Logger
     return out

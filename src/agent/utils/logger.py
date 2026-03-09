@@ -1,3 +1,5 @@
+"""Thread-safe JSONL logger for node inputs/outputs used in debugging and metrics extraction."""
+
 from __future__ import annotations
 
 import json
@@ -11,10 +13,12 @@ _LOG_DIR = Path(__file__).resolve().parent.parent / "logger"
 _NODE_IO_LOG_PATH = _LOG_DIR / "node_io_log.jsonl"
 
 
+# Log timestamp format for node events.
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
+# Best-effort conversion so arbitrary model objects can be written as JSON.
 def _to_jsonable(value: Any) -> Any:
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
@@ -42,6 +46,7 @@ def _to_jsonable(value: Any) -> Any:
     return str(value)
 
 
+# One JSON line per node event (enter/exit).
 def _write_node_entry(node: str, direction: str, data: Any) -> None:
     _LOG_DIR.mkdir(parents=True, exist_ok=True)
     entry = {
@@ -56,11 +61,12 @@ def _write_node_entry(node: str, direction: str, data: Any) -> None:
         with _NODE_IO_LOG_PATH.open("a", encoding="utf-8") as f:
             f.write(line + "\n")
 
-#Logs entire input and output contexts for nodes.
 
+# Persist node input context.
 def log_node_enter(node: str, ctx: Any) -> None:
     _write_node_entry(node=node, direction="in", data=ctx)
 
+
+# Persist node output patch/result.
 def log_node_exit(node: str, out: Any) -> None:
     _write_node_entry(node=node, direction="out", data=out)
-

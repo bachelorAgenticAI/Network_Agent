@@ -1,3 +1,5 @@
+"""Collect a lightweight snapshot of interface health from all configured routers."""
+
 import logging
 from typing import Any
 
@@ -6,6 +8,7 @@ from mcp_app.tools.interface_router import get_interface_status
 from mcp_app.utils.routers import ROUTERS
 
 
+# Build one normalized state payload used by compare_state.py.
 async def collect_all_devices_interfaces() -> dict[str, Any]:
     result: list[dict[str, Any]] = []
 
@@ -22,6 +25,7 @@ async def collect_all_devices_interfaces() -> dict[str, Any]:
 
             device_interfaces: list[dict[str, Any]] = []
 
+            # Expand interface groups from running config and enrich with live status.
             for intf_type, intf_entries in interfaces_data.items():
                 if not isinstance(intf_entries, list):
                     continue

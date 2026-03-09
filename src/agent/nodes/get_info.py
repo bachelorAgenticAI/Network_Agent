@@ -1,4 +1,5 @@
-# should write topoloy to memory and inject it to state.
+"""Run read-only tool calls to gather evidence for diagnosis and topology updates."""
+
 from __future__ import annotations
 
 import json
@@ -14,6 +15,7 @@ Use available tools to collect information relevant to the alert_description and
 IMPORTANT: every toolcall is used with arg: "router<number>" and never with hostname. Use full interface names (e.g. "GigabitEthernet0/0/1" not "Gi0/0/1").
 If no router number is provided, use previous_network_information to find the relevant router<number> for the target device/devices.
 Requirements:
+- Always run list_routers to get a map of each router_name and hostname. This is critical for topology mapping and toolcalls that require router<number>. 
 - Always run tools to get full overview of network state 
 - Secondary to that, use tools that directly validate the alert_description
 - You can not use tools that makes changes (e.g set_interface)
@@ -25,6 +27,7 @@ Requirements:
 """
 
 
+# This node focuses on gathering information through tool calls to inform the diagnosis.
 def get_info_node(state: AgentState, llm) -> dict:
     print("Gathering information with tools...")
     ctx = {
@@ -33,13 +36,12 @@ def get_info_node(state: AgentState, llm) -> dict:
         "attempts": state.get("attempts", 0),
         "previous_changes": state.get("changes") or [],
     }
-    log_node_enter("get_info", ctx)
+    log_node_enter("get_info", ctx)  # Logger
 
+    # Save cursor so later nodes can isolate just this round of tool messages.
     msg = SystemMessage(content=SYSTEM + "\n\nSTATE:\n" + json.dumps(ctx, ensure_ascii=False))
     info_start_cursor = len(state.get("messages") or [])
     ai = llm.invoke([msg], tool_choice="required")  # include tool_calls
-    tc = getattr(ai, "tool_calls", None)
-    print("tool_calls:", tc)
     out = {"messages": [ai], "info_start_cursor": info_start_cursor}
-    log_node_exit("get_info", out)
+    log_node_exit("get_info", out)  # Logger
     return out

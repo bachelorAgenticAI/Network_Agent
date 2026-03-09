@@ -1,3 +1,5 @@
+"""Main controller agent. Classify intent and decide whether remediation planning is required."""
+
 from __future__ import annotations
 
 import json
@@ -80,7 +82,7 @@ OUTPUT
 Return pure JSON that matches the required schema.
 """
 
-
+# This node determines the intent from the alert and after diagnosis is available, decides whether remediation is needed and generates a plan.
 def intent_node(state: AgentState, llm) -> dict:
     print("Determining intent")
     Alert_input = (state.get("user_input") or "").strip()
@@ -96,9 +98,9 @@ def intent_node(state: AgentState, llm) -> dict:
         "Previous_changes": state.get("changes") or [],
         "number_of_attempts": state.get("attempts", 0),
     }
-    print("Intent node context:", ctx)
-    log_node_enter("intent", ctx)
+    log_node_enter("intent", ctx) # Logger
 
+    # IntentOut gives typed control fields used for graph routing.
     msg = SystemMessage(content=SYSTEM + "\n\nSTATE:\n" + json.dumps(ctx, ensure_ascii=False))
     out: IntentOut = llm.with_structured_output(IntentOut).invoke([msg])
 
@@ -109,6 +111,7 @@ def intent_node(state: AgentState, llm) -> dict:
     }
 
     if diagnosis is not None:
+        # If diagnosis has no actionable findings, skip remediation.
         has_findings = bool(
             (diagnosis.get("root_causes") or [])
             or (diagnosis.get("risks") or [])
@@ -119,20 +122,18 @@ def intent_node(state: AgentState, llm) -> dict:
             updates["needs_fix"] = False
             updates["plan"] = {}
             updates["phase"] = "have_diagnosis"
-            log_node_exit("intent", updates)
-            print("attempts in assess_verify:", state.get("attempts"))
+            log_node_exit("intent", updates) # Logger
             return updates
 
         updates["needs_fix"] = bool(out.needs_fix) if out.needs_fix is not None else True
 
         if updates["needs_fix"]:
+            # Persist generated plan only when remediation is required.
             updates["plan"] = out.plan.model_dump()
-            print("Plan:", updates["plan"])
         else:
             updates["plan"] = {}
 
         updates["phase"] = "have_diagnosis"
 
-    log_node_exit("intent", updates)
-    print("attempts in assess_verify:", state.get("attempts"))
+    log_node_exit("intent", updates) # Logger
     return updates

@@ -1,3 +1,5 @@
+"""Turn raw verification tool outputs into a structured pass/fail decision."""
+
 from __future__ import annotations
 
 import json
@@ -18,8 +20,9 @@ Rules:
 Return structured output.
 """
 
-
+# Extract tool-related messages from the most recent verification round. If none, fallback to latest global tool messages.
 def _extract_recent_verify_tool_msgs(state: AgentState, limit: int = 30) -> list[dict]:
+    # Prefer messages from the current verify round; fallback to latest global tool activity.
     msgs = state.get("messages") or []
     start = int(state.get("verify_start_cursor") or 0)
     window = msgs[start:]
@@ -70,7 +73,7 @@ def _extract_recent_verify_tool_msgs(state: AgentState, limit: int = 30) -> list
 
     return list(reversed(toolish))
 
-
+# This node assesses whether verification passed based on recent tool outputs and sets up state for the next step.
 def assess_verify_node(state: AgentState, llm) -> dict:
     print("Assessing verification results...")
 
@@ -84,8 +87,9 @@ def assess_verify_node(state: AgentState, llm) -> dict:
         "network_db": db,
     }
 
-    log_node_enter("assess_verify", ctx)
+    log_node_enter("assess_verify", ctx) # Logger
 
+    # The LLM returns typed VerifyResult so downstream nodes can route safely.
     msg = SystemMessage(content=SYSTEM + "\n\nCTX:\n" + json.dumps(ctx, ensure_ascii=False))
     out: VerifyResult = llm.with_structured_output(VerifyResult).invoke([msg])
 
@@ -93,5 +97,5 @@ def assess_verify_node(state: AgentState, llm) -> dict:
         "verify": out.model_dump(),
     }
 
-    log_node_exit("assess_verify", patch)
+    log_node_exit("assess_verify", patch) # Logger
     return patch

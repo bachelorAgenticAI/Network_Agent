@@ -1,4 +1,5 @@
-# nodes/format_network.py
+"""Normalize recent tool outputs into a persistent network_db structure."""
+
 from __future__ import annotations
 
 import json
@@ -45,15 +46,16 @@ Meta:
 - Preserve or propagate meta.target.
 """
 
-
+# Safely convert a value to a JSON string and limit its size for prompts.
 def _jsonable(x: Any, max_chars: int = 14000) -> str:
+    # Serialize safely for prompt payloads and cap size to avoid huge context.
     try:
         s = json.dumps(x, ensure_ascii=False, default=str)
     except Exception:
         s = str(x)
     return s if len(s) <= max_chars else s[:max_chars] + "...(truncated)"
 
-
+# Check if a message is related to a tool call or tool result.
 def _is_tool_related(m: BaseMessage) -> bool:
     if isinstance(m, ToolMessage):
         return True
@@ -61,8 +63,9 @@ def _is_tool_related(m: BaseMessage) -> bool:
         return True
     return False
 
-
+# Try to parse JSON content from a tool message; return the original value if parsing fails.
 def _safe_parse_json(content: Any) -> Any:
+    # Some tool messages are JSON strings; parse when possible.
     if not isinstance(content, str):
         return content
     try:
@@ -70,8 +73,9 @@ def _safe_parse_json(content: Any) -> Any:
     except Exception:
         return content
 
-
+# Reduce the size of large values (dict, list, or string) before sending them to the formatter.
 def _shrink_value(value: Any, max_chars: int = 1800) -> Any:
+    # Truncate large values before sending into the formatter context.
     if isinstance(value, (dict, list)):
         raw = json.dumps(value, ensure_ascii=False, default=str)
         if len(raw) <= max_chars:
@@ -81,7 +85,7 @@ def _shrink_value(value: Any, max_chars: int = 1800) -> Any:
         return value[:max_chars] + "...(truncated)"
     return value
 
-
+# Extract a compact list of recent tool calls and results for the formatter model.
 def _build_recent_tool_data(window: list[BaseMessage], max_items: int = 20) -> list[dict[str, Any]]:
     calls_by_id: dict[str, dict[str, Any]] = {}
     for m in window:
@@ -115,7 +119,7 @@ def _build_recent_tool_data(window: list[BaseMessage], max_items: int = 20) -> l
 
     return data[-max_items:]
 
-
+# Save the updated network_db to the local memory store and return any warnings.
 def _persist_network_db(network_db: dict[str, Any]) -> list[str]:
     try:
         store = MemoryStore()
@@ -126,7 +130,7 @@ def _persist_network_db(network_db: dict[str, Any]) -> list[str]:
     except Exception as e:
         return [f"persist_network_db_failed: {e!r}"]
 
-
+# If no new tool data exists, keep the current database and only update metadata.
 def _fast_path_no_new_tool_data(state: AgentState, target: str) -> dict:
     existing = (state.get("network_db") or {}).copy()
     meta = existing.setdefault("meta", {})
@@ -139,12 +143,13 @@ def _fast_path_no_new_tool_data(state: AgentState, target: str) -> dict:
         out["warnings"] = warnings
     return out
 
-
+# This node normalizes recent tool outputs into a persistent network_db structure, merging updates incrementally while preserving unchanged data.
 def format_network_node(state: AgentState, llm_format) -> dict:
     print("Formatting network info...")
     target = state.get("target") or "network"
     messages = state.get("messages") or []
 
+    # Only process tool activity from this info round.
     info_start = int(state.get("info_start_cursor") or 0)
     recent_window = [m for m in messages[info_start:] if _is_tool_related(m)]
 
@@ -167,7 +172,7 @@ def format_network_node(state: AgentState, llm_format) -> dict:
         "previous_network_db": state.get("network_db") or {},
         "recent_tool_data": recent_tool_data,
     }
-    log_node_enter("format_network", payload)
+    log_node_enter("format_network", payload) # Logger
 
     formatter = llm_format.with_structured_output(FormatResult)
     result: FormatResult = formatter.invoke(
@@ -184,5 +189,5 @@ def format_network_node(state: AgentState, llm_format) -> dict:
     out = {"network_db": network_db, "phase": "have_info"}
     if warnings:
         out["warnings"] = warnings
-    log_node_exit("format_network", out)
+    log_node_exit("format_network", out) # Logger
     return out

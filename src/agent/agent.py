@@ -1,3 +1,5 @@
+"""Build and run the LangGraph workflow for monitoring, diagnosis, remediation, and summary."""
+
 import asyncio
 
 from dotenv import load_dotenv
@@ -25,6 +27,7 @@ from agent.utils.logger import log_node_enter, log_node_exit
 load_dotenv()
 
 
+# Main controller: choose the next phase based on diagnosis + verification status.
 def _route_from_controller(state: AgentState) -> str:
     v = state.get("verify") or {}
     # Only retry after verification failure if we're past initial phase
@@ -36,7 +39,7 @@ def _route_from_controller(state: AgentState) -> str:
     if state.get("phase") == "start":
         return "get_info"
 
-    d = state.get("diagnosis")  # kan være None
+    d = state.get("diagnosis")  # Can be None before diagnose node runs.
     if d is None:
         return "diagnose"
     if state.get("needs_fix") is True:
@@ -48,6 +51,7 @@ def _route_from_controller(state: AgentState) -> str:
     return "summary"
 
 
+# After assess_verify: either finish or loop back for another attempt.
 def _after_verify_assess(state: AgentState) -> str:
     v = state.get("verify") or {}
     if v.get("passed") is True:
@@ -57,12 +61,15 @@ def _after_verify_assess(state: AgentState) -> str:
     return "intent"
 
 
+# Continue remediation until all planned steps are executed.
 def _after_collect_changes(state: AgentState) -> str:
     if state.get("remediation_done") is True:
         return "verify"
     return "remediation"
 
 
+# Track how many remediation/verification loops have been attempted.
+# After x attempts, give up and move to summary to avoid infinite loops on hard problems.
 def _inc_attempts(state: AgentState) -> dict:
     attempts = state.get("attempts")
     if attempts is None:
@@ -72,6 +79,7 @@ def _inc_attempts(state: AgentState) -> dict:
     return {"attempts": attempts}
 
 
+# Clear derived state so the next pass starts from fresh evidence.
 def _reset_for_retry(state: AgentState) -> dict:
     return {
         "diagnosis": None,
@@ -95,8 +103,9 @@ def build_app(
     tools_remediate_node,
     tools_verify_node,
 ):
+    # Build the state machine: info path -> diagnose -> (optional) fix -> verify -> summary.
     graph = StateGraph(AgentState)
-
+    # Define each node, either as a simple function or a LangGraph node with tool access.
     graph.add_node("ingestion", ingestion)
     graph.add_node("intent", lambda s: intent_node(s, llm_intent))
     graph.add_node("get_info", lambda s: get_info_node(s, llm_info))
@@ -115,6 +124,8 @@ def build_app(
     graph.add_node("inc_attempts", _inc_attempts)
     graph.add_node("reset_for_retry", _reset_for_retry)
 
+    # Define edges between nodes, including conditional edges based on state.
+    # The main controller node ("intent") routes to different phases based on current state (diagnosis, verification results, etc).
     graph.add_edge(START, "ingestion")
     graph.add_edge("ingestion", "intent")
 
@@ -129,13 +140,13 @@ def build_app(
         },
     )
 
-    # Info path
+    # Info collection path.
     graph.add_edge("get_info", "tools_info")
     graph.add_edge("tools_info", "format_network")
     graph.add_edge("format_network", "diagnose")
     graph.add_edge("diagnose", "intent")
 
-    # Remediation + verify path
+    # Remediation and verification path.
     graph.add_edge("remediation", "tools_remediate")
     graph.add_edge("tools_remediate", "collect_changes")
     graph.add_conditional_edges(
@@ -148,7 +159,7 @@ def build_app(
     )
     graph.add_edge("verify", "tools_verify")
     graph.add_edge("tools_verify", "assess_verify")
-
+    # After verification, either loop back to intent for another round or finish with summary.
     graph.add_conditional_edges(
         "assess_verify",
         _after_verify_assess,
@@ -164,35 +175,10 @@ def build_app(
     return graph.compile(checkpointer=MemorySaver())
 
 
+# Run the agent loop: monitor for alerts, then run the workflow for each alert.
+# Runs asynchronously to allow for sleeping between monitoring cycles and to handle async tool calls.
 async def main():
-    """
-    client = MultiServerMCPClient({
-        "mcp_intent":     {"transport": "streamable_http", "url": "http://127.0.0.1:8000/mcp/intent"},
-        "mcp_info":       {"transport": "streamable_http", "url": "http://127.0.0.1:8000/mcp/info"},
-        "mcp_remediate":  {"transport": "streamable_http", "url": "http://127.0.0.1:8000/mcp/remediate"},
-        "mcp_verify":     {"transport": "streamable_http", "url": "http://127.0.0.1:8000/mcp/verify"},
-    })
 
-    tools_intent = await client.get_tools(server_name="mcp_intent")
-    tools_info = await client.get_tools(server_name="mcp_info")
-    tools_remediate = await client.get_tools(server_name="mcp_remediate")
-    tools_verify = await client.get_tools(server_name="mcp_verify")
-
-    base = ChatOpenAI(model="gpt-5-mini", temperature=0)
-    llm_intent = base.bind_tools(tools_intent)
-    llm_info = base.bind_tools(tools_info)
-    llm_remediate = base.bind_tools(tools_remediate)
-    llm_verify = base.bind_tools(tools_verify)
-
-    tools_info_node = ToolNode(tools_info)
-    tools_remediate_node = ToolNode(tools_remediate)
-    tools_verify_node = ToolNode(tools_verify)
-
-    app = build_app(
-        llm_intent, llm_info, llm_remediate, llm_verify,
-        tools_info_node, tools_remediate_node, tools_verify_node,
-    )
-    """
     try:
         client = MultiServerMCPClient(
             {
@@ -207,16 +193,18 @@ async def main():
         print("TOOLS:", len(tools_all))
         print([getattr(t, "name", None) for t in tools_all])
     except Exception:
-        print("Kunne ikke hente tools fra MCP")
+        print("Could not connect to MCP")
         return
 
-    # Quick test: samme tools overalt
+    # Binds one shared tool set to all phases. For simplicity, using same LLM for all nodes'.
     tools_intent = tools_all
     tools_info = tools_all
     tools_remediate = tools_all
     tools_verify = tools_all
 
-    base = ChatOpenAI(model="gpt-5-mini", temperature=0)
+    base = ChatOpenAI(
+        model="gpt-5-mini", temperature=0
+    )  # Choice of model and temperature should be tuned based on needs of each node.
     llm_intent = base.bind_tools(tools_intent)
     llm_info = base.bind_tools(tools_info)
     llm_remediate = base.bind_tools(tools_remediate)
@@ -235,7 +223,7 @@ async def main():
         tools_remediate_node,
         tools_verify_node,
     )
-
+    # The monitoring loop runs indefinitely, checking for new alerts in a set time. When an alert is detected, it triggers the workflow with the alert as input.
     config = {"configurable": {"thread_id": "monitor-driven"}}
     thread_id = 0
 
@@ -249,12 +237,9 @@ async def main():
                 config["configurable"]["thread_id"] = f"alert-{thread_id}"
                 log_node_enter(
                     "monitor_loop",
-                    {
-                        "thread_id": config["configurable"]["thread_id"],
-                        "alerts": alerts
-                    },
+                    {"thread_id": config["configurable"]["thread_id"], "alerts": alerts},
                 )
-
+                # Main agent invocation with the detected alert as input.
                 state = await app.ainvoke({"user_input": str(alerts)}, config=config)
                 log_node_exit(
                     "monitor_loop",
@@ -267,11 +252,12 @@ async def main():
                 )
                 print(state["messages"][-1].content)
                 try:
-                    write_extracted_logs() #Extract logs after each run.
+                    # Produce simplified run metrics after every completed incident.
+                    write_extracted_logs()
                 except Exception as extract_err:
                     print(f"Extract logs failed: {extract_err}")
 
-            # Ensure monitoring never runs more often than every 5 minutes
+            # Sleep between monitoring cycles to avoid excessive resource use.
             await asyncio.sleep(10)
 
         except KeyboardInterrupt:

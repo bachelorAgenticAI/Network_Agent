@@ -1,3 +1,5 @@
+"""Execute remediation plan steps one at a time via tool calls."""
+
 from __future__ import annotations
 
 import json
@@ -26,7 +28,7 @@ Stopping condition:
 - Stop when all PLAN steps are executed.
 """
 
-
+# This node executes remediation steps from the PLAN one at a time, ensuring that each step is executed in order and that all steps are completed before marking remediation as done.
 def remediation_node(state: AgentState, llm) -> dict:
     print("Executing remediation plan...")
     plan = state.get("plan") or {}
@@ -34,6 +36,7 @@ def remediation_node(state: AgentState, llm) -> dict:
     step_idx = int(state.get("remediation_step_idx") or 0)
     remedy_start_cursor = len(state.get("messages") or [])
 
+    # If all steps are complete, mark remediation as done.
     if step_idx >= len(plan_steps):
         print("No remaining remediation plan steps.")
         out = {
@@ -43,6 +46,7 @@ def remediation_node(state: AgentState, llm) -> dict:
         }
         return out
 
+    # Execute only the current step; collect_changes advances the index afterward.
     current_step = plan_steps[step_idx] or {}
     action_name = (current_step.get("action") or "").strip()
 
@@ -59,7 +63,7 @@ def remediation_node(state: AgentState, llm) -> dict:
         "previous_changes": state.get("changes") or [],
         "attempts": state.get("attempts", 0),
     }
-    log_node_enter("remediation", ctx)
+    log_node_enter("remediation", ctx) # Logger
 
     step_instruction = (
         "Execute ONLY current_step now. "
@@ -71,8 +75,9 @@ def remediation_node(state: AgentState, llm) -> dict:
     )
 
     ai = llm.invoke([msg], tool_choice="required")
+    # Log tool calls for remedy in cli
     tc = getattr(ai, "tool_calls", None)
     print("tool_calls for remedy:", tc)
     out = {"messages": [ai], "phase": "fixed", "remedy_start_cursor": remedy_start_cursor}
-    log_node_exit("remediation", out)
+    log_node_exit("remediation", out) # Logger
     return out

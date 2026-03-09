@@ -1,3 +1,5 @@
+"""Pydantic schemas shared across intent, diagnosis, formatting, and verification nodes."""
+
 from __future__ import annotations
 
 from typing import Literal
@@ -5,16 +7,18 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+# Agent schemas used by control/decision nodes.
 class RootCause(BaseModel):
     type: str
     cause: str
     evidence: list[str] = Field(default_factory=list)
     confidence: float = Field(0.0, ge=0.0, le=1.0)
 
-
+# Schema used for diagnosis output.
 class Diagnosis(BaseModel):
     root_causes: list[RootCause] = Field(default_factory=list)
     missing_info: list[str] = Field(default_factory=list)
+
 
 class PlanStep(BaseModel):
     id: int
@@ -23,19 +27,20 @@ class PlanStep(BaseModel):
     target: str | None = None
     parameters: list[str] = Field(default_factory=list)
 
-
+# Schema for intent node output, which includes the intent and plan for remediation if needed.
 class Plan(BaseModel):
     problem: str = ""
     fix_summary: str = ""
     plan_steps: list[PlanStep] = Field(default_factory=list)
 
+# Schema for verification result, which includes whether the issue is resolved and supporting evidence.
 class VerifyResult(BaseModel):
     passed: bool
     evidence: list[str] = Field(default_factory=list)
     remaining_issues: list[str] = Field(default_factory=list)
     missing_info: list[str] = Field(default_factory=list)
 
-
+# Determine intent and next step.
 class IntentOut(BaseModel):
     intent: Literal["check", "check_and_fix"] = Field(description="Base intent of input")
     intent_description: str = Field(description="Explain the intent for other nodes")
@@ -45,11 +50,12 @@ class IntentOut(BaseModel):
     plan: Plan = Field(default_factory=Plan)
 
 
-# Network schemas
+# Network schemas used by format_network.
 class KV(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    # Keep as string for predictable schema output.
     k: str
-    v: str  # enklest; evt Union[str,int,float,bool,None]
+    v: str
 
 
 class Device(BaseModel):
@@ -109,7 +115,7 @@ class NetworkMeta(BaseModel):
     ts: str
     target: str
 
-
+# Main structure for the normalized network database used across formatting and verification nodes.
 class NetworkDB(BaseModel):
     model_config = ConfigDict(extra="forbid")
     topology: TopologyInfo = Field(default_factory=TopologyInfo)
@@ -117,7 +123,7 @@ class NetworkDB(BaseModel):
     sources: list[Source] = Field(default_factory=list)
     meta: NetworkMeta | None = None
 
-
+# Schema for formatted network state output, which includes the normalized network database.
 class FormatResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
     network_db: NetworkDB

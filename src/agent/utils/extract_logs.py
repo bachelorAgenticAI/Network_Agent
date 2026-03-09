@@ -1,3 +1,5 @@
+"""Convert raw node_io logs into a compact run summary for analytics and reporting."""
+
 from __future__ import annotations
 
 import json
@@ -10,11 +12,11 @@ LOG_DIR = Path(__file__).resolve().parent.parent / "logger"
 NODE_IO_LOG_PATH = LOG_DIR / "node_io_log.jsonl"
 EXTRACTED_LOGS_PATH = LOG_DIR / "extracted_logs.json"
 
-
+# Log timestamps may use Z; normalize to ISO format understood by datetime.
 def _parse_ts(ts: str) -> datetime:
     return datetime.fromisoformat(ts.replace("Z", "+00:00"))
 
-
+# Read line-delimited node logs into memory.
 def _load_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         raise FileNotFoundError(f"Missing log file: {path}")
@@ -28,27 +30,29 @@ def _load_jsonl(path: Path) -> list[dict[str, Any]]:
             rows.append(json.loads(line))
     return rows
 
-
-def _find(entries: list[dict[str, Any]], node: str, direction: str, *, first: bool) -> dict[str, Any] | None:
+# Find first/last event for a given node+direction pair.
+def _find(
+    entries: list[dict[str, Any]], node: str, direction: str, *, first: bool
+) -> dict[str, Any] | None:
     matches = [e for e in entries if e.get("node") == node and e.get("direction") == direction]
     if not matches:
         return None
     return matches[0] if first else matches[-1]
 
-
+# Normalize a string into snake_case. Non-alphanumeric characters are replaced with underscores.
 def _snake_case(text: str) -> str:
     text = text.lower().strip()
     text = re.sub(r"[^a-z0-9]+", "_", text)
     return text.strip("_")
 
-
+# Normalize issue type based on cause text, with some custom rules for common network issues.
 def _normalize_issue_type(cause_text: str) -> str:
     c = cause_text.lower()
     if "admin" in c and ("shutdown" in c or "shut down" in c):
         return "admin_shutdown"
     return _snake_case(cause_text or "unknown")
 
-
+# Tool output may be raw string or embedded JSON chunks; normalize to status text.
 def _extract_change_result(raw_result: Any) -> str:
     if isinstance(raw_result, list):
         for item in raw_result:
@@ -68,7 +72,7 @@ def _extract_change_result(raw_result: Any) -> str:
         return raw_result
     return "unknown"
 
-
+# Pull a few normalized metrics from free-text verification evidence.
 def _extract_verify_evidence_obj(verify: dict[str, Any]) -> dict[str, Any]:
     evidence = verify.get("evidence", [])
     if not isinstance(evidence, list):
@@ -105,7 +109,7 @@ def _extract_verify_evidence_obj(verify: dict[str, Any]) -> dict[str, Any]:
 
     return out
 
-
+# Aggregate token usage across all logged model messages.
 def _sum_tokens(entries: list[dict[str, Any]]) -> dict[str, int]:
     prompt_tokens = 0
     completion_tokens = 0
@@ -129,7 +133,7 @@ def _sum_tokens(entries: list[dict[str, Any]]) -> dict[str, int]:
         "total_tokens": total_tokens,
     }
 
-
+# Count tool calls inside one node output payload.
 def _tool_calls_count(entry: dict[str, Any] | None) -> int:
     if not entry:
         return 0
@@ -146,7 +150,7 @@ def _tool_calls_count(entry: dict[str, Any] | None) -> int:
             total += len(tool_calls)
     return total
 
-
+# Number of times each node ran in this incident (based on "in" events).
 def _node_cycles(entries: list[dict[str, Any]]) -> dict[str, int]:
     cycles: dict[str, int] = {}
     for entry in entries:
@@ -158,7 +162,7 @@ def _node_cycles(entries: list[dict[str, Any]]) -> dict[str, int]:
         cycles[node] = cycles.get(node, 0) + 1
     return cycles
 
-
+# Build one structured run document from raw node enter/exit events.
 def build_extracted(entries: list[dict[str, Any]]) -> dict[str, Any]:
     if not entries:
         raise ValueError("No entries in node_io_log.jsonl")
@@ -211,8 +215,12 @@ def build_extracted(entries: list[dict[str, Any]]) -> dict[str, Any]:
     all_start = min(_parse_ts(e["ts"]) for e in entries)
     all_end = max(_parse_ts(e["ts"]) for e in entries)
 
-    intent_in_events = [e for e in entries if e.get("node") == "intent" and e.get("direction") == "in"]
-    intent_out_events = [e for e in entries if e.get("node") == "intent" and e.get("direction") == "out"]
+    intent_in_events = [
+        e for e in entries if e.get("node") == "intent" and e.get("direction") == "in"
+    ]
+    intent_out_events = [
+        e for e in entries if e.get("node") == "intent" and e.get("direction") == "out"
+    ]
     diagnose_in = _find(entries, "diagnose", "in", first=True)
     diagnose_out_event = _find(entries, "diagnose", "out", first=False)
     remediation_in = _find(entries, "remediation", "in", first=True)
@@ -222,28 +230,46 @@ def build_extracted(entries: list[dict[str, Any]]) -> dict[str, Any]:
 
     detect_s = 0.0
     if intent_in_events and intent_out_events:
-        detect_s = round((_parse_ts(intent_out_events[0]["ts"]) - _parse_ts(intent_in_events[0]["ts"])).total_seconds(), 1)
+        detect_s = round(
+            (
+                _parse_ts(intent_out_events[0]["ts"]) - _parse_ts(intent_in_events[0]["ts"])
+            ).total_seconds(),
+            1,
+        )
 
     diagnose_s = 0.0
     if diagnose_in and diagnose_out_event:
-        diagnose_s = round((_parse_ts(diagnose_out_event["ts"]) - _parse_ts(diagnose_in["ts"])).total_seconds(), 1)
+        diagnose_s = round(
+            (_parse_ts(diagnose_out_event["ts"]) - _parse_ts(diagnose_in["ts"])).total_seconds(), 1
+        )
 
     remediate_s = 0.0
     if remediation_in and remediation_out:
-        remediate_s = round((_parse_ts(remediation_out["ts"]) - _parse_ts(remediation_in["ts"])).total_seconds(), 1)
+        remediate_s = round(
+            (_parse_ts(remediation_out["ts"]) - _parse_ts(remediation_in["ts"])).total_seconds(), 1
+        )
 
     verify_s = 0.0
     if verify_in and assess_verify_out_event:
-        verify_s = round((_parse_ts(assess_verify_out_event["ts"]) - _parse_ts(verify_in["ts"])).total_seconds(), 1)
+        verify_s = round(
+            (_parse_ts(assess_verify_out_event["ts"]) - _parse_ts(verify_in["ts"])).total_seconds(),
+            1,
+        )
 
     get_info_out = _find(entries, "get_info", "out", first=False)
     verify_out = _find(entries, "verify", "out", first=False)
 
     tool_calls_pre_diagnosis = _tool_calls_count(get_info_out)
     tool_calls_verify = _tool_calls_count(verify_out)
-    tool_calls_total = tool_calls_pre_diagnosis + _tool_calls_count(remediation_out) + tool_calls_verify
+    tool_calls_total = (
+        tool_calls_pre_diagnosis + _tool_calls_count(remediation_out) + tool_calls_verify
+    )
 
-    run_id = monitor_in_data.get("thread_id") or monitor_out.get("data", {}).get("thread_id") or "unknown"
+    run_id = (
+        monitor_in_data.get("thread_id")
+        or monitor_out.get("data", {}).get("thread_id")
+        or "unknown"
+    )
     test_case_id = f"tc_{_snake_case(str(input_alert.get('type', 'unknown')))}_{issue_type}_01"
 
     return {
@@ -261,7 +287,9 @@ def build_extracted(entries: list[dict[str, Any]]) -> dict[str, Any]:
             "interface": input_alert.get("interface"),
             "root_causes_ranked": [
                 {
-                    "type": _normalize_issue_type(str(rc.get("type", ""))) if rc.get("type") else None,
+                    "type": _normalize_issue_type(str(rc.get("type", "")))
+                    if rc.get("type")
+                    else None,
                     "cause": _normalize_issue_type(str(rc.get("cause", "unknown"))),
                     "confidence": rc.get("confidence"),
                     "evidence": rc.get("evidence", []),
@@ -303,8 +331,10 @@ def build_extracted(entries: list[dict[str, Any]]) -> dict[str, Any]:
         },
     }
 
-
-def write_extracted_logs(input_path: Path = NODE_IO_LOG_PATH, output_path: Path = EXTRACTED_LOGS_PATH) -> Path:
+# Write the extracted logs to a JSON file. This is the main entrypoint used by the monitor loop after each run.
+def write_extracted_logs(
+    input_path: Path = NODE_IO_LOG_PATH, output_path: Path = EXTRACTED_LOGS_PATH
+) -> Path:
     entries = _load_jsonl(input_path)
     extracted = build_extracted(entries)
     output_path.parent.mkdir(parents=True, exist_ok=True)

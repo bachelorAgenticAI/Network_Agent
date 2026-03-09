@@ -1,3 +1,5 @@
+"""Generate the final user-facing summary for one run."""
+
 from __future__ import annotations
 
 import json
@@ -16,7 +18,7 @@ Verification: passed/failed and what remains
 Keep it brief, without internal agent meta.
 """
 
-
+# This node generates a final summary message for the user.
 def summary_node(state: AgentState, llm) -> dict:
     print("Generating summary for user...")
     ctx = {
@@ -31,10 +33,10 @@ def summary_node(state: AgentState, llm) -> dict:
         "verify": state.get("verify") or {},
         "attempts": state.get("attempts", 0),
     }
-    log_node_enter("summary", ctx)
+    log_node_enter("summary", ctx) # Logger
 
     msg = SystemMessage(content=SYSTEM + "\n\nCTX:\n" + json.dumps(ctx, ensure_ascii=False))
     ai = llm.invoke([msg])
     out = {"messages": [ai]}
-    log_node_exit("summary", out)
+    log_node_exit("summary", out) # Logger
     return out

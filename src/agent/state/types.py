@@ -1,3 +1,5 @@
+"""TypedDict state contract shared by all graph nodes."""
+
 from __future__ import annotations
 
 from typing import Annotated, TypedDict
@@ -6,15 +8,16 @@ from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 
 
+# This module defines the AgentState TypedDict, which specifies the structure of the state object passed between nodes in the agent's execution graph.
 class AgentState(TypedDict, total=False):
     # Conversation
     messages: Annotated[list[BaseMessage], add_messages]
-    user_input: str
+    user_input: str  # Used for alert
 
     # Control
-    intent: str  # "check" | "check_and_fix" 
-    intent_description: str  # natural language explanation of intent
-    
+    intent: str  # "check" | "check_and_fix"
+    intent_description: str  # natural language explanation of intent for other nodes
+
     target: str | None
     attempts: int
     phase: str  # "start" | "have_info" | "have_diagnosis" | "fixed" | "verified"

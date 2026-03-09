@@ -1,3 +1,5 @@
+"""Compare previous and current network snapshots and emit alerts for meaningful changes."""
+
 import asyncio
 import json
 import logging
@@ -14,20 +16,20 @@ CUSTOM_ALERT_FILE = MEMORY_DIR / "custom_alerts.json"  # <--- manual test
 ERROR_THRESHOLD = 50
 DROP_THRESHOLD = 50
 
-
+# Small helper to read JSON with a default fallback.
 def load_json(file_path, default=None):
     if not file_path.exists():
         return default
     with open(file_path) as f:
         return json.load(f)
 
-
+# Ensure parent folder exists before writing.
 def save_json(file_path, data):
     file_path.parent.mkdir(parents=True, exist_ok=True)
     with open(file_path, "w") as f:
         json.dump(data, f, indent=2)
 
-
+# Flatten state into {device: {interface_name: interface_data}} for quick diffs.
 def build_map(state):
     devices = {}
     for device in state.get("devices", []):
@@ -35,21 +37,19 @@ def build_map(state):
         devices[device["device"]] = interfaces
     return devices
 
-
+# Load and clear custom alerts for test cases.
 def load_custom_alerts():
-    """Load and clear custom alerts for test cases."""
     if not CUSTOM_ALERT_FILE.exists():
         return []
     alerts = load_json(CUSTOM_ALERT_FILE, default=[])
     CUSTOM_ALERT_FILE.unlink()  # remove after loading
     return alerts
 
-
+# Test mode: if custom alerts are provided, bypass live comparison.
 async def compare():
-    # Load custom alerts first
     custom_alerts = load_custom_alerts()
 
-    # If custom alerts exist → use only them
+    # Use only injected alerts when present.
     if custom_alerts:
         save_json(ALERT_FILE, custom_alerts)
         print_alerts(custom_alerts)
@@ -72,7 +72,7 @@ async def compare():
             key = f"{device}:{name}"
             incident = updated_incidents.get(key)
 
-            # ===== New Interface Detection =====
+            # New interface appeared since previous snapshot.
             if not old_intf:
                 alerts.append(
                     {
@@ -88,7 +88,7 @@ async def compare():
             old_oper = old_intf.get("oper_state")
             new_oper = new_intf.get("oper_state")
 
-            # ===== Oper State Change =====
+            # Operational state changed (for example up -> down).
             if old_oper != new_oper:
                 if incident:
                     updated_incidents.pop(key, None)
@@ -104,7 +104,7 @@ async def compare():
                     )
                     updated_incidents[key] = {"active": True}
 
-            # ===== Counter Thresholds =====
+            # Error/drop counters crossed configured thresholds.
             for metric, threshold in [
                 ("input_errors", ERROR_THRESHOLD),
                 ("output_errors", ERROR_THRESHOLD),
@@ -137,7 +137,7 @@ def print_alerts(alerts):
         print("\n=== ALERT SUMMARY ===")
         print("No alerts detected\n")
         return
-
+    # Format a simple table of alerts for quick review in cli.
     print("\n=== ALERT SUMMARY ===\n")
 
     header = f"{'DEVICE':20} {'INTERFACE':20} {'TYPE':25} DETAILS"
