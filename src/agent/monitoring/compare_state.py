@@ -9,7 +9,7 @@ MEMORY_DIR = Path(__file__).resolve().parent.parent / "memory"
 STATE_FILE = MEMORY_DIR / "last_state.json"
 ALERT_FILE = MEMORY_DIR / "alerts.json"
 INCIDENT_FILE = MEMORY_DIR / "incidents.json"
-CUSTOM_ALERT_FILE = MEMORY_DIR / "custom_alerts.json"  # <--- manual test alerts
+CUSTOM_ALERT_FILE = MEMORY_DIR / "custom_alerts.json"  # <--- manual test
 
 ERROR_THRESHOLD = 50
 DROP_THRESHOLD = 50
@@ -46,12 +46,19 @@ def load_custom_alerts():
 
 
 async def compare():
+    # Load custom alerts first
+    custom_alerts = load_custom_alerts()
+
+    # If custom alerts exist → use only them
+    if custom_alerts:
+        save_json(ALERT_FILE, custom_alerts)
+        print_alerts(custom_alerts)
+        return custom_alerts
+
     old_state = load_json(STATE_FILE, default={"devices": []})
     new_state = await collect_all_devices_interfaces()
 
-    # Start with any custom alerts
-    alerts = load_custom_alerts()
-
+    alerts = []
     old_map = build_map(old_state)
     new_map = build_map(new_state)
     incidents = load_json(INCIDENT_FILE, default={})
@@ -67,12 +74,14 @@ async def compare():
 
             # ===== New Interface Detection =====
             if not old_intf:
-                alerts.append({
-                    "type": "interface_new",
-                    "device": device,
-                    "interface": name,
-                    "new_oper_state": new_intf.get("oper_state"),
-                })
+                alerts.append(
+                    {
+                        "type": "interface_new",
+                        "device": device,
+                        "interface": name,
+                        "new_oper_state": new_intf.get("oper_state"),
+                    }
+                )
                 updated_incidents[key] = {"active": True}
                 continue
 
@@ -84,13 +93,15 @@ async def compare():
                 if incident:
                     updated_incidents.pop(key, None)
                 else:
-                    alerts.append({
-                        "type": "oper_state_change",
-                        "device": device,
-                        "interface": name,
-                        "old_state": old_oper,
-                        "new_state": new_oper,
-                    })
+                    alerts.append(
+                        {
+                            "type": "oper_state_change",
+                            "device": device,
+                            "interface": name,
+                            "old_state": old_oper,
+                            "new_state": new_oper,
+                        }
+                    )
                     updated_incidents[key] = {"active": True}
 
             # ===== Counter Thresholds =====
@@ -103,15 +114,16 @@ async def compare():
                 new_val = new_intf.get(metric) or 0
                 delta = max(0, new_val - old_val)
                 if delta >= threshold:
-                    alerts.append({
-                        "type": "threshold_exceeded",
-                        "device": device,
-                        "interface": name,
-                        "metric": metric,
-                        "errors_since_last_check": delta,
-                    })
+                    alerts.append(
+                        {
+                            "type": "threshold_exceeded",
+                            "device": device,
+                            "interface": name,
+                            "metric": metric,
+                            "errors_since_last_check": delta,
+                        }
+                    )
 
-    # Save current state, incidents, and all alerts
     save_json(STATE_FILE, new_state)
     save_json(INCIDENT_FILE, updated_incidents)
     save_json(ALERT_FILE, alerts)
