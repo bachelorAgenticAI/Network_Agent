@@ -5,12 +5,11 @@ from pathlib import Path
 
 from agent.monitoring.get_quick_state import collect_all_devices_interfaces
 
-logging.basicConfig(level=logging.INFO)
-
 MEMORY_DIR = Path(__file__).resolve().parent.parent / "memory"
 STATE_FILE = MEMORY_DIR / "last_state.json"
 ALERT_FILE = MEMORY_DIR / "alerts.json"
 INCIDENT_FILE = MEMORY_DIR / "incidents.json"
+CUSTOM_ALERT_FILE = MEMORY_DIR / "custom_alerts.json"  # <--- manual test
 
 ERROR_THRESHOLD = 50
 DROP_THRESHOLD = 50
@@ -37,12 +36,29 @@ def build_map(state):
     return devices
 
 
+def load_custom_alerts():
+    """Load and clear custom alerts for test cases."""
+    if not CUSTOM_ALERT_FILE.exists():
+        return []
+    alerts = load_json(CUSTOM_ALERT_FILE, default=[])
+    CUSTOM_ALERT_FILE.unlink()  # remove after loading
+    return alerts
+
+
 async def compare():
+    # Load custom alerts first
+    custom_alerts = load_custom_alerts()
+
+    # If custom alerts exist → use only them
+    if custom_alerts:
+        save_json(ALERT_FILE, custom_alerts)
+        print_alerts(custom_alerts)
+        return custom_alerts
+
     old_state = load_json(STATE_FILE, default={"devices": []})
     new_state = await collect_all_devices_interfaces()
 
     alerts = []
-
     old_map = build_map(old_state)
     new_map = build_map(new_state)
     incidents = load_json(INCIDENT_FILE, default={})
@@ -53,10 +69,8 @@ async def compare():
 
         for name, new_intf in interfaces.items():
             old_intf = old_interfaces.get(name)
-
             key = f"{device}:{name}"
-            new_state_val = new_intf.get("oper_state")
-            incident = incidents.get(key)
+            incident = updated_incidents.get(key)
 
             # ===== New Interface Detection =====
             if not old_intf:
@@ -65,43 +79,30 @@ async def compare():
                         "type": "interface_new",
                         "device": device,
                         "interface": name,
-                        "new_state": new_state_val,
+                        "new_oper_state": new_intf.get("oper_state"),
                     }
                 )
+                updated_incidents[key] = {"active": True}
                 continue
 
-            old_state_val = old_intf.get("oper_state")
+            old_oper = old_intf.get("oper_state")
+            new_oper = new_intf.get("oper_state")
 
-            # ===== Interface Down Detection =====
-            if old_state_val == "up" and new_state_val == "down":
-                if not incident or not incident.get("active"):
+            # ===== Oper State Change =====
+            if old_oper != new_oper:
+                if incident:
+                    updated_incidents.pop(key, None)
+                else:
                     alerts.append(
                         {
-                            "type": "interface_down",
+                            "type": "oper_state_change",
                             "device": device,
                             "interface": name,
-                            "old_state": old_state_val,
-                            "new_state": new_state_val,
+                            "old_state": old_oper,
+                            "new_state": new_oper,
                         }
                     )
                     updated_incidents[key] = {"active": True}
-
-            # ===== Interface Up =====
-            elif old_state_val == "down" and new_state_val == "up":
-                # Recovery: clear incident, no alert
-                if incident and incident.get("active"):
-                    updated_incidents[key]["active"] = False
-                else:
-                    # Unexpected up event
-                    alerts.append(
-                        {
-                            "type": "interface_up",
-                            "device": device,
-                            "interface": name,
-                            "old_state": old_state_val,
-                            "new_state": new_state_val,
-                        }
-                    )
 
             # ===== Counter Thresholds =====
             for metric, threshold in [
@@ -109,28 +110,50 @@ async def compare():
                 ("output_errors", ERROR_THRESHOLD),
                 ("drops", DROP_THRESHOLD),
             ]:
-                old_val = old_intf.get(metric, 0) or 0
-                new_val = new_intf.get(metric, 0) or 0
+                old_val = old_intf.get(metric) or 0
+                new_val = new_intf.get(metric) or 0
+                delta = max(0, new_val - old_val)
+                if delta >= threshold:
+                    alerts.append(
+                        {
+                            "type": "threshold_exceeded",
+                            "device": device,
+                            "interface": name,
+                            "metric": metric,
+                            "errors_since_last_check": delta,
+                        }
+                    )
 
-                if new_val >= old_val:
-                    delta = new_val - old_val
-                    if delta >= threshold:
-                        alerts.append(
-                            {
-                                "type": "threshold_exceeded",
-                                "device": device,
-                                "interface": name,
-                                "metric": metric,
-                                "delta": delta,
-                            }
-                        )
-
-    # Save current state and incidents
     save_json(STATE_FILE, new_state)
     save_json(INCIDENT_FILE, updated_incidents)
     save_json(ALERT_FILE, alerts)
 
+    print_alerts(alerts)
     return alerts
+
+
+def print_alerts(alerts):
+    if not alerts:
+        print("\n=== ALERT SUMMARY ===")
+        print("No alerts detected\n")
+        return
+
+    print("\n=== ALERT SUMMARY ===\n")
+
+    header = f"{'DEVICE':20} {'INTERFACE':20} {'TYPE':25} DETAILS"
+    print(header)
+    print("-" * len(header))
+
+    for a in alerts:
+        device = a.get("device", "-")
+        interface = a.get("interface", "-")
+        alert_type = a.get("type", "-")
+        details = ", ".join(
+            f"{k}={v}" for k, v in a.items() if k not in ("device", "interface", "type")
+        )
+        print(f"{device:20} {interface:20} {alert_type:25} {details}")
+
+    print()
 
 
 if __name__ == "__main__":
