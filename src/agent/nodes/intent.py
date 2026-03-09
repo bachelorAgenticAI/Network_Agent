@@ -6,7 +6,7 @@ from langchain_core.messages import SystemMessage
 
 from agent.state.schemas import IntentOut
 from agent.state.types import AgentState
-from agent.utils.logger import log_node_enter, log_node_exit, log_schema_output
+from agent.utils.logger import log_node_enter, log_node_exit
 
 SYSTEM = """You are a network agent controller.
 
@@ -101,8 +101,6 @@ def intent_node(state: AgentState, llm) -> dict:
 
     msg = SystemMessage(content=SYSTEM + "\n\nSTATE:\n" + json.dumps(ctx, ensure_ascii=False))
     out: IntentOut = llm.with_structured_output(IntentOut).invoke([msg])
-
-    log_schema_output("intent", schema=IntentOut, output=out, state=state)
 
     updates: dict = {
         "intent": out.intent,

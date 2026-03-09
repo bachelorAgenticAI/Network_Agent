@@ -19,6 +19,8 @@ from agent.nodes.remediation import remediation_node
 from agent.nodes.summary import summary_node
 from agent.nodes.verify import verify_node
 from agent.state.types import AgentState
+from agent.utils.extract_logs import write_extracted_logs
+from agent.utils.logger import log_node_enter, log_node_exit
 
 load_dotenv()
 
@@ -242,14 +244,32 @@ async def main():
             print("\n[Monitoring] Running check...")
 
             alerts = await compare()
-
             if alerts:
                 thread_id += 1
                 config["configurable"]["thread_id"] = f"alert-{thread_id}"
+                log_node_enter(
+                    "monitor_loop",
+                    {
+                        "thread_id": config["configurable"]["thread_id"],
+                        "alerts": alerts
+                    },
+                )
 
                 state = await app.ainvoke({"user_input": str(alerts)}, config=config)
-
+                log_node_exit(
+                    "monitor_loop",
+                    {
+                        "thread_id": config["configurable"]["thread_id"],
+                        "last_message": (
+                            state.get("messages", [])[-1].content if state.get("messages") else None
+                        ),
+                    },
+                )
                 print(state["messages"][-1].content)
+                try:
+                    write_extracted_logs() #Extract logs after each run.
+                except Exception as extract_err:
+                    print(f"Extract logs failed: {extract_err}")
 
             # Ensure monitoring never runs more often than every 5 minutes
             await asyncio.sleep(10)

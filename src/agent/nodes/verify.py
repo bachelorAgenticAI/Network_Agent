@@ -5,6 +5,7 @@ import json
 from langchain_core.messages import SystemMessage
 
 from agent.state.types import AgentState
+from agent.utils.logger import log_node_enter, log_node_exit
 
 SYSTEM = """You are a verification agent.
 Run relevant verify-tools based on the diagnosis, plan, and executed changes.
@@ -30,6 +31,9 @@ def verify_node(state: AgentState, llm) -> dict:
         "plan": state.get("plan") or {},
         "changes_tail": (state.get("changes") or [])[-25:],
     }
+    log_node_enter("verify", ctx)
     msg = SystemMessage(content=SYSTEM + "\n\nCTX:\n" + json.dumps(ctx, ensure_ascii=False))
     ai = llm.invoke([msg])  # may include tool_calls
-    return {"messages": [ai], "phase": "verified", "verify_start_cursor": verify_start_cursor}
+    out = {"messages": [ai], "phase": "verified", "verify_start_cursor": verify_start_cursor}
+    log_node_exit("verify", out)
+    return out

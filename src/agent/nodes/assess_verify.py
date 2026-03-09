@@ -6,7 +6,7 @@ from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
 
 from agent.state.schemas import VerifyResult
 from agent.state.types import AgentState
-from agent.utils.logger import log_node_enter, log_node_exit, log_schema_output
+from agent.utils.logger import log_node_enter, log_node_exit
 
 SYSTEM = """You evaluate the result of verify-tools and conclude passed=True/False.
 Rules:
@@ -88,8 +88,6 @@ def assess_verify_node(state: AgentState, llm) -> dict:
 
     msg = SystemMessage(content=SYSTEM + "\n\nCTX:\n" + json.dumps(ctx, ensure_ascii=False))
     out: VerifyResult = llm.with_structured_output(VerifyResult).invoke([msg])
-
-    log_schema_output("assess_verify", schema=VerifyResult, output=out, state=state)
 
     patch = {
         "verify": out.model_dump(),

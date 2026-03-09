@@ -6,14 +6,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class RootCause(BaseModel):
+    type: str
     cause: str
     evidence: list[str] = Field(default_factory=list)
-    confidence: float = 0.0
+    confidence: float = Field(0.0, ge=0.0, le=1.0)
 
 
 class Diagnosis(BaseModel):
     root_causes: list[RootCause] = Field(default_factory=list)
-    risks: list[str] = Field(default_factory=list)
     missing_info: list[str] = Field(default_factory=list)
 
 class PlanStep(BaseModel):
