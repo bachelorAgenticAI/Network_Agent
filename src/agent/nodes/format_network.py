@@ -9,6 +9,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from agent.nodes.helpers.memory_store import MemoryStore, utc_now
 from agent.state.schemas import FormatResult
 from agent.state.types import AgentState
+from agent.utils.logger import log_node_enter, log_node_exit
 
 SYSTEM = """
 You reconstruct network_db by MERGING updates from recent_tool_data into previous_network_db.
@@ -149,7 +150,16 @@ def format_network_node(state: AgentState, llm_format) -> dict:
 
     recent_tool_data = _build_recent_tool_data(recent_window, max_items=20)
     if not recent_tool_data:
-        return _fast_path_no_new_tool_data(state, target)
+        payload = {
+            "target": target,
+            "intent": state.get("intent"),
+            "previous_network_db": state.get("network_db") or {},
+            "recent_tool_data": [],
+        }
+        log_node_enter("format_network", payload)
+        out = _fast_path_no_new_tool_data(state, target)
+        log_node_exit("format_network", out)
+        return out
 
     payload = {
         "target": target,
@@ -157,6 +167,7 @@ def format_network_node(state: AgentState, llm_format) -> dict:
         "previous_network_db": state.get("network_db") or {},
         "recent_tool_data": recent_tool_data,
     }
+    log_node_enter("format_network", payload)
 
     formatter = llm_format.with_structured_output(FormatResult)
     result: FormatResult = formatter.invoke(
@@ -173,4 +184,5 @@ def format_network_node(state: AgentState, llm_format) -> dict:
     out = {"network_db": network_db, "phase": "have_info"}
     if warnings:
         out["warnings"] = warnings
+    log_node_exit("format_network", out)
     return out

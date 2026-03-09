@@ -5,6 +5,7 @@ import json
 from langchain_core.messages import SystemMessage
 
 from agent.state.types import AgentState
+from agent.utils.logger import log_node_enter, log_node_exit
 
 SYSTEM = """You are a network remediation agent.
 You receive a remediation PLAN consisting of ordered change-steps. Your job is to execute the PLAN fully.
@@ -35,18 +36,19 @@ def remediation_node(state: AgentState, llm) -> dict:
 
     if step_idx >= len(plan_steps):
         print("No remaining remediation plan steps.")
-        return {
+        out = {
             "phase": "fixed",
             "remedy_start_cursor": remedy_start_cursor,
             "remediation_done": True,
         }
+        return out
 
     current_step = plan_steps[step_idx] or {}
     action_name = (current_step.get("action") or "").strip()
 
     ctx = {
         "intent": state.get("intent"),
-        "intent_description": state.get("intent_description"),
+        "alert_description": state.get("intent_description"),
         "target": state.get("target"),
         "network_db": state.get("network_db") or {},
         "diagnosis": state.get("diagnosis") or {},
@@ -57,6 +59,7 @@ def remediation_node(state: AgentState, llm) -> dict:
         "previous_changes": state.get("changes") or [],
         "attempts": state.get("attempts", 0),
     }
+    log_node_enter("remediation", ctx)
 
     step_instruction = (
         "Execute ONLY current_step now. "
@@ -70,4 +73,6 @@ def remediation_node(state: AgentState, llm) -> dict:
     ai = llm.invoke([msg], tool_choice="required")
     tc = getattr(ai, "tool_calls", None)
     print("tool_calls for remedy:", tc)
-    return {"messages": [ai], "phase": "fixed", "remedy_start_cursor": remedy_start_cursor}
+    out = {"messages": [ai], "phase": "fixed", "remedy_start_cursor": remedy_start_cursor}
+    log_node_exit("remediation", out)
+    return out

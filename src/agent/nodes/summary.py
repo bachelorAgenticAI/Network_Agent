@@ -5,6 +5,7 @@ import json
 from langchain_core.messages import SystemMessage
 
 from agent.state.types import AgentState
+from agent.utils.logger import log_node_enter, log_node_exit
 
 SYSTEM = """Write a short, precise summary for the user. Include:
 
@@ -30,7 +31,10 @@ def summary_node(state: AgentState, llm) -> dict:
         "verify": state.get("verify") or {},
         "attempts": state.get("attempts", 0),
     }
+    log_node_enter("summary", ctx)
 
     msg = SystemMessage(content=SYSTEM + "\n\nCTX:\n" + json.dumps(ctx, ensure_ascii=False))
     ai = llm.invoke([msg])
-    return {"messages": [ai]}
+    out = {"messages": [ai]}
+    log_node_exit("summary", out)
+    return out

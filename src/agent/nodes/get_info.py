@@ -6,15 +6,16 @@ import json
 from langchain_core.messages import SystemMessage
 
 from agent.state.types import AgentState
+from agent.utils.logger import log_node_enter, log_node_exit
 
 SYSTEM = """You are a network agent tasked with gathering facts via tools.
-Use available tools to collect information relevant to the intent_description and target and to build/update network topology.
+Use available tools to collect information relevant to the alert_description and target and to build/update network topology.
 
 IMPORTANT: every toolcall is used with arg: "router<number>" and never with hostname. Use full interface names (e.g. "GigabitEthernet0/0/1" not "Gi0/0/1").
 If no router number is provided, use previous_network_information to find the relevant router<number> for the target device/devices.
 Requirements:
 - Always run tools to get full overview of network state 
-- Secondary to that, use tools that directly validate the intent_description
+- Secondary to that, use tools that directly validate the alert_description
 - You can not use tools that makes changes (e.g set_interface)
 - You must use tools (tool calls) to retrieve data (do not guess).
 - If attempts > 0, avoid repeating the exact same tool+args combinations unless they are required to confirm state drift.
@@ -27,15 +28,18 @@ Requirements:
 def get_info_node(state: AgentState, llm) -> dict:
     print("Gathering information with tools...")
     ctx = {
-        "intent_description": state.get("intent_description"),
+        "alert_description": state.get("intent_description"),
         "target": state.get("target"),
         "attempts": state.get("attempts", 0),
         "previous_changes": state.get("changes") or [],
     }
+    log_node_enter("get_info", ctx)
 
     msg = SystemMessage(content=SYSTEM + "\n\nSTATE:\n" + json.dumps(ctx, ensure_ascii=False))
     info_start_cursor = len(state.get("messages") or [])
     ai = llm.invoke([msg], tool_choice="required")  # include tool_calls
     tc = getattr(ai, "tool_calls", None)
     print("tool_calls:", tc)
-    return {"messages": [ai], "info_start_cursor": info_start_cursor}
+    out = {"messages": [ai], "info_start_cursor": info_start_cursor}
+    log_node_exit("get_info", out)
+    return out
