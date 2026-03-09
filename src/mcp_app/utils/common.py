@@ -1,5 +1,3 @@
-# from utils.common import get_client, encode_intf
-
 import urllib.parse
 
 import httpx
@@ -10,8 +8,8 @@ HEADERS = {
 }
 
 
+# Return a preconfigured Async HTTP client for a router
 def get_client(router):
-    # Returnerer en prekonfigurert httpx.AsyncClient for en router
     return httpx.AsyncClient(
         verify=False,
         auth=(router.user, router.password),
@@ -20,7 +18,6 @@ def get_client(router):
     )
 
 
-# NB! Bytt function navn til noe uten "intf"
-# Encode special characters for RESTCONF URL's
+# Encode special characters for RESTCONF URLs (e.g., interface names)
 def encode_intf(name: str) -> str:
     return urllib.parse.quote(name, safe="")

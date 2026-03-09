@@ -1,14 +1,12 @@
-# interface_tools.py
 import logging
 
 from mcp_app.utils.common import encode_intf, get_client
 from mcp_app.utils.routers import get_router
 
 
+# Enable a specific interface. Called by set_interface_state wrapper.
 async def enable_interface(router_name: str, interface_name: str) -> dict:
-    """
-    Enable a specific interface (no shutdown) using RESTCONF DELETE.
-    """
+
     router = get_router(router_name)
 
     interface_type = "".join(filter(str.isalpha, interface_name))
@@ -44,10 +42,9 @@ async def enable_interface(router_name: str, interface_name: str) -> dict:
             return {"status": "error", "message": str(e)}
 
 
+# Disable a specific interface. Called by set_interface_state wrapper.
 async def disable_interface(router_name: str, interface_name: str) -> dict:
-    """
-    Disable a specific interface (shutdown) using RESTCONF PATCH.
-    """
+
     router = get_router(router_name)
 
     interface_type = "".join(filter(str.isalpha, interface_name))
@@ -84,17 +81,13 @@ async def disable_interface(router_name: str, interface_name: str) -> dict:
             return {"status": "error", "message": str(e)}
 
 
+# Wrapper to enable or disable an interface based on 'up'/'down' state
 async def set_interface_state(
     router_name: str,
     interface_name: str,
     state: str,
 ) -> dict:
-    """
-    Wrapper tool that calls enable_interface or disable_interface.
 
-    Args:
-        state: "up" or "down"
-    """
     if state.lower() == "up":
         return await enable_interface(router_name, interface_name)
 
@@ -107,6 +100,7 @@ async def set_interface_state(
     }
 
 
+# Configure primary IPv4 address on an interface
 async def configure_interface(
     router_name: str,
     interface_name: str,
@@ -158,6 +152,7 @@ async def configure_interface(
             return {"status": "error", "message": str(e)}
 
 
+# Remove an interface
 async def remove_interface(
     router_name: str,
     interface_name: str,
@@ -192,6 +187,7 @@ async def remove_interface(
             return {"status": "error", "message": str(e)}
 
 
+# Set description on an interface
 async def set_interface_description(
     router_name: str, interface_name: str, description: str
 ) -> dict:
@@ -216,23 +212,13 @@ async def set_interface_description(
 
 
 def rem_interface_tools(mcp):
-    mcp.tool(
-        description=(
-            "Administratively enable or disable an interface. "
-            "Use to remediate link state issues or isolate faults."
-        )
-    )(set_interface_state)
+    mcp.tool(description=("Administratively enable or disable an interface. "))(set_interface_state)
 
-    mcp.tool(
-        description=("Configure primary IPv4 address on an interface.")
-    )(configure_interface)
+    mcp.tool(description=("Configure primary IPv4 address on an interface."))(configure_interface)
 
-    mcp.tool(
-        description=(
-            "Delete an interface configuration stanza from the router. "
-            "Use with caution as dependent services may break."
-        )
-    )(remove_interface)
+    mcp.tool(description=("Delete an interface configuration stanza from the router. "))(
+        remove_interface
+    )
 
     mcp.tool(
         description=("Set interface description text for documentation and operational clarity.")

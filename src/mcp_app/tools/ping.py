@@ -5,6 +5,7 @@ import asyncssh
 from mcp_app.utils.routers import get_router
 
 
+# Perform a ping from a device to a destination
 async def ping(router_name: str, destination: str, source: str = None) -> dict:
     router = get_router(router_name)
     logging.info(f"Pinging {destination} from {router.name} ({router.host})")
@@ -14,6 +15,7 @@ async def ping(router_name: str, destination: str, source: str = None) -> dict:
         cmd += f" source {source}"
 
     try:
+        # Connect to router via SSH
         async with asyncssh.connect(
             router.host,
             username=router.user,
@@ -27,6 +29,7 @@ async def ping(router_name: str, destination: str, source: str = None) -> dict:
         return {"error": str(e)}
 
 
+# Perform a traceroute from a device to a destination
 async def traceroute(router_name: str, destination: str) -> dict:
     router = get_router(router_name)
     logging.info(f"Tracerouting to {destination} from {router.name} ({router.host})")
@@ -34,6 +37,7 @@ async def traceroute(router_name: str, destination: str) -> dict:
     cmd = f"traceroute {destination}"
 
     try:
+        # Connect to router via SSH
         async with asyncssh.connect(
             router.host,
             username=router.user,
@@ -47,7 +51,7 @@ async def traceroute(router_name: str, destination: str) -> dict:
         return {"error": str(e)}
 
 
-def register_ping_tools(mcp):
+def ping_tools(mcp):
     mcp.tool(
         description=("Run ping from the router CLI to validate end-to-end reachability/latency.")
     )(ping)

@@ -1,19 +1,13 @@
-# rem_dhcp_tools.py
 import logging
 
 from mcp_app.utils.common import get_client
 from mcp_app.utils.routers import get_router
 
-# --- DHCP POOL ---
 
-
+# Create or update a DHCP pool on the router
 async def create_dhcp_pool(router_name: str, pool_id: str, default_router: str) -> dict:
-    """
-    Oppretter/oppdaterer en DHCP pool via RESTCONF (PUT på liste-element).
-    """
-    router = get_router(router_name)
 
-    # IOS-XE: PUT må gjøres på liste-elementet (pool=<id>)
+    router = get_router(router_name)
     path = f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/ip/dhcp/pool={pool_id}"
 
     payload = {
@@ -36,10 +30,9 @@ async def create_dhcp_pool(router_name: str, pool_id: str, default_router: str) 
             return {"status": "error", "message": str(e)}
 
 
+# Delete a DHCP pool from the router
 async def delete_dhcp_pool(router_name: str, pool_id: str) -> dict:
-    """
-    Sletter en DHCP pool (DELETE på liste-element).
-    """
+
     router = get_router(router_name)
     path = f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/ip/dhcp/pool={pool_id}"
 
@@ -54,27 +47,7 @@ async def delete_dhcp_pool(router_name: str, pool_id: str) -> dict:
             return {"status": "error", "message": str(e)}
 
 
-async def get_dhcp_pool(router_name: str, pool_id: str) -> dict:
-    """
-    Henter en spesifikk DHCP pool (GET).
-    """
-    router = get_router(router_name)
-    path = f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/ip/dhcp/pool={pool_id}"
-
-    logging.info(f"Henter DHCP pool '{pool_id}' fra {router.name}")
-
-    async with get_client(router) as client:
-        try:
-            r = await client.get(path)
-            r.raise_for_status()
-            return {"status": "success", "data": r.json()}
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
-
-
-# --- DHCP EXCLUDED ADDRESS ---
-
-
+# Add or update a DHCP excluded-address range to prevent leasing reserved IPs
 async def patch_dhcp_excluded_address(
     router_name: str, low_address: str, high_address: str
 ) -> dict:
@@ -110,24 +83,6 @@ async def patch_dhcp_excluded_address(
             return {"status": "error", "message": str(e)}
 
 
-async def get_dhcp_config(router_name: str) -> dict:
-    """
-    Henter hele DHCP-konfigen (GET på /native/ip/dhcp).
-    """
-    router = get_router(router_name)
-    path = f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/ip/dhcp"
-
-    logging.info(f"Henter DHCP config fra {router.name}")
-
-    async with get_client(router) as client:
-        try:
-            r = await client.get(path)
-            r.raise_for_status()
-            return {"status": "success", "data": r.json()}
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
-
-
 def rem_dhcp_tools(mcp):
     mcp.tool(
         description=("Create or update a DHCP pool entry used for client address assignment.")
@@ -136,11 +91,5 @@ def rem_dhcp_tools(mcp):
         delete_dhcp_pool
     )
     mcp.tool(
-        description=("Read one DHCP pool configuration for verification and troubleshooting.")
-    )(get_dhcp_pool)
-    mcp.tool(
         description=("Add or update DHCP excluded-address range to prevent leasing reserved IPs.")
     )(patch_dhcp_excluded_address)
-    mcp.tool(description=("Read full DHCP configuration subtree for diagnostics and validation."))(
-        get_dhcp_config
-    )

@@ -1,11 +1,10 @@
-# device_info.py
 import logging
 
-# For when mcp is run as a server (relative imports)
 from mcp_app.utils.common import get_client
 from mcp_app.utils.routers import get_router
 
 
+# Retrieve selected sections of the router running configuration
 async def get_running_config(router_name: str) -> dict:
     router = get_router(router_name)
     logging.info(f"Fetching running config from {router.name} ({router.host})")
@@ -34,7 +33,7 @@ async def get_running_config(router_name: str) -> dict:
             return {"error": str(e)}
 
 
-def register_config_tools(mcp):
+def config_tools(mcp):
     mcp.tool(
         description=(
             "Fetch key sections of the running configuration for troubleshooting and baseline checks "

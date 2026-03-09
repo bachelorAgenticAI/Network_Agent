@@ -1,16 +1,11 @@
-# ospf_tools.py
 import logging
 
 from mcp_app.utils.common import get_client
 from mcp_app.utils.routers import get_router
 
-# ----------------- OSPF INTERFACES -----------------
 
-
+# Retrieve OSPF interface details for a router
 async def get_ospf_interfaces(router_name: str) -> dict:
-    """
-    Hent OSPF interface-informasjon: op_mode, process_id, router_id, area_id, interface_name, state, cost
-    """
     router = get_router(router_name)
     logging.info(f"Fetching OSPF interfaces from {router.name} ({router.host})")
     base = f"https://{router.host}/restconf"
@@ -23,6 +18,8 @@ async def get_ospf_interfaces(router_name: str) -> dict:
 
             interfaces = []
             op_mode = data.get("op-mode")
+
+            # Iterate through OSPF instances and areas to collect interface info
             for instance in data.get("ospf-instance", []):
                 process_id = instance.get("process-id")
                 router_id = instance.get("router-id")
@@ -48,13 +45,8 @@ async def get_ospf_interfaces(router_name: str) -> dict:
             return {"error": str(e)}
 
 
-# ----------------- OSPF NEIGHBORS -----------------
-
-
+# Retrieve OSPF neighbor details per interface
 async def get_ospf_neighbors(router_name: str) -> dict:
-    """
-    Hent OSPF naboer per interface: interface_name, neighbor_id, neighbor_address, neighbor_state
-    """
     router = get_router(router_name)
     logging.info(f"Fetching OSPF neighbors from {router.name} ({router.host})")
     base = f"https://{router.host}/restconf"
@@ -66,6 +58,8 @@ async def get_ospf_neighbors(router_name: str) -> dict:
             data = r.json().get("Cisco-IOS-XE-ospf-oper:ospf-state", {})
 
             neighbors = []
+
+            # Iterate through instances, areas, and interfaces to collect neighbor info
             for instance in data.get("ospf-instance", []):
                 for area in instance.get("ospf-area", []):
                     for iface in area.get("ospf-interface", []):
@@ -87,15 +81,12 @@ async def get_ospf_neighbors(router_name: str) -> dict:
             return {"error": str(e)}
 
 
-# ----------------- OSPF WRAPPER TOOL -----------------
-
-
+# Combine OSPF interfaces and neighbors for a full operational view
 async def get_ospf(router_name: str) -> dict:
     """
-    Hent OSPF info med både interfaces og tilhørende naboer.
-    Output kobler naboer til interface via 'interface_name'.
+    Fetch both OSPF interfaces and their neighbors.
+    Neighbors are linked to interfaces via 'interface_name'.
     """
-    # Hent interfaces og neighbors fra eksisterende tools
     interfaces_result = await get_ospf_interfaces(router_name)
     neighbors_result = await get_ospf_neighbors(router_name)
 
@@ -107,7 +98,7 @@ async def get_ospf(router_name: str) -> dict:
     interfaces = interfaces_result.get("ospf_interfaces", [])
     neighbors = neighbors_result.get("ospf_neighbors", [])
 
-    # Koble naboer til riktig interface
+    # Attach relevant neighbors to each interface
     for iface in interfaces:
         iface_name = iface["interface_name"]
         iface["neighbors"] = [nbr for nbr in neighbors if nbr["interface_name"] == iface_name]
@@ -115,10 +106,9 @@ async def get_ospf(router_name: str) -> dict:
     return {"ospf_full": interfaces}
 
 
-def register_ospf_tools(mcp):
+def ospf_tools(mcp):
     mcp.tool(
         description=(
             "Collect OSPF operational view with interface state, area/process context, cost, and mapped neighbors. "
-            "Use to diagnose adjacency formation and area/interface mismatches."
         )
     )(get_ospf)

@@ -4,7 +4,8 @@ from mcp_app.utils.common import get_client
 from mcp_app.utils.routers import get_router
 
 
-async def get_ip_arp_table(router_name: str) -> dict:
+# Retrieve the ARP table from a router
+async def get_arp_table(router_name: str) -> dict:
     router = get_router(router_name)
     logging.info(f"Fetching ARP table from {router.name} ({router.host})")
     base = f"https://{router.host}/restconf"
@@ -39,10 +40,7 @@ async def get_ip_arp_table(router_name: str) -> dict:
             return {"error": str(e)}
 
 
-def register_arp_tools(mcp):
+def arp_tools(mcp):
     mcp.tool(
-        description=(
-            "Retrieve the router ARP table for diagnostics (IP-to-MAC mappings per VRF). "
-            "Use this to validate L2/L3 adjacency and stale/incorrect ARP entries."
-        )
-    )(get_ip_arp_table)
+        description=("Retrieve the router ARP table for diagnostics (IP-to-MAC mappings per VRF). ")
+    )(get_arp_table)

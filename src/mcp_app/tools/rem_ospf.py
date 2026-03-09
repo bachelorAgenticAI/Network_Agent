@@ -1,26 +1,16 @@
-# ospf_tools.py
 from mcp_app.utils.common import encode_intf, get_client
 from mcp_app.utils.routers import get_router
 
-# --- OSPF PROSESSSTYRING ---
 
-
+# Create or update an OSPF process with optional Router-ID
 async def configure_ospf_process(router_name: str, process_id: int, router_id: str = None) -> dict:
-    """
-    Configures or updates an OSPF process with a specific Router-ID
-    using a targeted RESTCONF path.
-    """
+
     router = get_router(router_name)
-
-    # Target the specific list instance rather than the parent container
     path = f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/router/Cisco-IOS-XE-ospf:router-ospf/ospf/process-id={process_id}"
-
-    # Payload should match the structure of the resource you are patching
     payload = {"Cisco-IOS-XE-ospf:process-id": {"id": process_id, "router-id": router_id}}
 
     async with get_client(router) as client:
         try:
-            # PATCH updates only the fields provided
             r = await client.patch(path, json=payload)
             r.raise_for_status()
             return {
@@ -31,10 +21,9 @@ async def configure_ospf_process(router_name: str, process_id: int, router_id: s
             return {"status": "error", "message": f"Failed to set router-id: {str(e)}"}
 
 
+# Delete an entire OSPF process
 async def delete_ospf_process(router_name: str, process_id: int) -> dict:
-    """
-    Sletter en hel OSPF-prosess.
-    """
+
     router = get_router(router_name)
     path = f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/router/Cisco-IOS-XE-ospf:router-ospf/ospf/process-id={process_id}"
 
@@ -47,15 +36,11 @@ async def delete_ospf_process(router_name: str, process_id: int) -> dict:
             return {"status": "error", "message": str(e)}
 
 
-# --- OSPF NETTVERK / AREAS ---
-
-
+# Add a network statement to an OSPF area
 async def add_ospf_network(
     router_name: str, process_id: int, ip_network: str, wildcard: str, area: int
 ) -> dict:
-    """
-    Legger til et nettverk i en OSPF area.
-    """
+
     router = get_router(router_name)
     path = f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/router"
 
@@ -83,13 +68,9 @@ async def add_ospf_network(
             return {"status": "error", "message": str(e)}
 
 
-# --- GRENSESNITT OSPF (COST) ---
-
-
+# Set OSPF cost on a specific interface
 async def set_interface_ospf_cost(router_name: str, interface_name: str, cost: int) -> dict:
-    """
-    Setter OSPF cost på et spesifikt grensesnitt.
-    """
+
     router = get_router(router_name)
     interface_type = "".join(filter(str.isalpha, interface_name))
     interface_id = interface_name[len(interface_type) :]
@@ -116,10 +97,9 @@ async def set_interface_ospf_cost(router_name: str, interface_name: str, cost: i
             return {"status": "error", "message": str(e)}
 
 
+# Remove explicit OSPF cost from an interface
 async def remove_interface_ospf_cost(router_name: str, interface_name: str) -> dict:
-    """
-    Fjerner OSPF cost fra et grensesnitt.
-    """
+
     router = get_router(router_name)
     interface_type = "".join(filter(str.isalpha, interface_name))
     interface_id = interface_name[len(interface_type) :]
@@ -136,16 +116,9 @@ async def remove_interface_ospf_cost(router_name: str, interface_name: str) -> d
             return {"status": "error", "message": str(e)}
 
 
-# --- OSPF DEFAULT ROUTE ANNONSERING ---
-
-
+# Enable 'default-information originate' for an OSPF process
 async def enable_ospf_default_information_originate(router_name: str, process_id: int) -> dict:
-    """
-    Aktiverer default-information originate i OSPF prosess.
-    Tilsvarer:
-      router ospf <process_id>
-        default-information originate
-    """
+
     router = get_router(router_name)
     path = (
         f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/router/"
@@ -168,13 +141,9 @@ async def enable_ospf_default_information_originate(router_name: str, process_id
             return {"status": "error", "message": str(e)}
 
 
+# Disable 'default-information originate' for an OSPF process
 async def disable_ospf_default_information_originate(router_name: str, process_id: int) -> dict:
-    """
-    Deaktiverer default-information originate i OSPF prosess.
-    Tilsvarer:
-      router ospf <process_id>
-        no default-information originate
-    """
+
     router = get_router(router_name)
     path = (
         f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/router/"
