@@ -103,12 +103,15 @@ def build_app(
     tools_remediate_node,
     tools_verify_node,
 ):
+    def _run_get_info(state: AgentState) -> dict:
+        return get_info_node(state, llm_info)
+
     # Build the state machine: info path -> diagnose -> (optional) fix -> verify -> summary.
     graph = StateGraph(AgentState)
     # Define each node, either as a simple function or a LangGraph node with tool access.
     graph.add_node("ingestion", ingestion)
     graph.add_node("intent", lambda s: intent_node(s, llm_intent))
-    graph.add_node("get_info", lambda s: get_info_node(s, llm_info))
+    graph.add_node("get_info", _run_get_info)
     graph.add_node("format_network", lambda s: format_network_node(s, llm_info))
     graph.add_node("diagnose", lambda s: diagnose_node(s, llm_info))
     graph.add_node("remediation", lambda s: remediation_node(s, llm_remediate))
@@ -223,24 +226,33 @@ async def main():
         tools_remediate_node,
         tools_verify_node,
     )
-    # The monitoring loop runs indefinitely, checking for new alerts in a set time. When an alert is detected, it triggers the workflow with the alert as input.
+     # The monitoring loop runs indefinitely, checking for new alerts in a set time. When an alert is detected, it triggers the workflow with the alert as input.
     config = {"configurable": {"thread_id": "monitor-driven"}}
     thread_id = 0
+    run_without_alert = True
 
     while True:
         try:
             print("\n[Monitoring] Running check...")
 
             alerts = await compare()
-            if alerts:
+
+            # If run_without_alert is True, override alerts with empty value
+            if run_without_alert:
+                alerts = None
+
+            # Only proceed if there are alerts OR run_without_alert is True
+            if alerts or run_without_alert:
                 thread_id += 1
                 config["configurable"]["thread_id"] = f"alert-{thread_id}"
                 log_node_enter(
                     "monitor_loop",
                     {"thread_id": config["configurable"]["thread_id"], "alerts": alerts},
                 )
-                # Main agent invocation with the detected alert as input.
+
+                # Main agent invocation with the alert (or empty) as input
                 state = await app.ainvoke({"user_input": str(alerts)}, config=config)
+
                 log_node_exit(
                     "monitor_loop",
                     {
@@ -250,7 +262,10 @@ async def main():
                         ),
                     },
                 )
-                print(state["messages"][-1].content)
+
+                if state.get("messages"):
+                    print(state["messages"][-1].content)
+
                 try:
                     # Produce simplified run metrics after every completed incident.
                     write_extracted_logs()
