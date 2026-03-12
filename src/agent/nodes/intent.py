@@ -102,7 +102,9 @@ def intent_node(state: AgentState, llm) -> dict:
 
     # IntentOut gives typed control fields used for graph routing.
     msg = SystemMessage(content=SYSTEM + "\n\nSTATE:\n" + json.dumps(ctx, ensure_ascii=False))
-    out: IntentOut = llm.with_structured_output(IntentOut).invoke([msg])
+    result = llm.with_structured_output(IntentOut, include_raw=True).invoke([msg])
+    out: IntentOut = result["parsed"]
+    raw = result["raw"]
 
     updates: dict = {
         "intent": out.intent,
@@ -122,7 +124,7 @@ def intent_node(state: AgentState, llm) -> dict:
             updates["needs_fix"] = False
             updates["plan"] = {}
             updates["phase"] = "have_diagnosis"
-            log_node_exit("intent", updates) # Logger
+            log_node_exit("intent", {**updates, "messages": [raw]}) # Logger
             return updates
 
         updates["needs_fix"] = bool(out.needs_fix) if out.needs_fix is not None else True
@@ -135,5 +137,5 @@ def intent_node(state: AgentState, llm) -> dict:
 
         updates["phase"] = "have_diagnosis"
 
-    log_node_exit("intent", updates) # Logger
+    log_node_exit("intent", {**updates, "messages": [raw]}) # Logger
     return updates

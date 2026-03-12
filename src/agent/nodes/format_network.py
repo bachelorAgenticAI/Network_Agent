@@ -174,12 +174,14 @@ def format_network_node(state: AgentState, llm_format) -> dict:
     }
     log_node_enter("format_network", payload) # Logger
 
-    formatter = llm_format.with_structured_output(FormatResult)
-    result: FormatResult = formatter.invoke(
+    formatter = llm_format.with_structured_output(FormatResult, include_raw=True)
+    result = formatter.invoke(
         [SystemMessage(content=SYSTEM), HumanMessage(content=_jsonable(payload))]
     )
+    parsed: FormatResult = result["parsed"]
+    raw = result["raw"]
 
-    network_db = result.network_db.model_dump(mode="json")
+    network_db = parsed.network_db.model_dump(mode="json")
     meta = network_db.setdefault("meta", {})
     meta["ts"] = utc_now()
     meta.setdefault("target", target)
@@ -189,5 +191,5 @@ def format_network_node(state: AgentState, llm_format) -> dict:
     out = {"network_db": network_db, "phase": "have_info"}
     if warnings:
         out["warnings"] = warnings
-    log_node_exit("format_network", out) # Logger
+    log_node_exit("format_network", {**out, "messages": [raw]}) # Logger
     return out

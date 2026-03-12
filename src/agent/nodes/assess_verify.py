@@ -91,11 +91,13 @@ def assess_verify_node(state: AgentState, llm) -> dict:
 
     # The LLM returns typed VerifyResult so downstream nodes can route safely.
     msg = SystemMessage(content=SYSTEM + "\n\nCTX:\n" + json.dumps(ctx, ensure_ascii=False))
-    out: VerifyResult = llm.with_structured_output(VerifyResult).invoke([msg])
+    result = llm.with_structured_output(VerifyResult, include_raw=True).invoke([msg])
+    out: VerifyResult = result["parsed"]
+    raw = result["raw"]
 
     patch = {
         "verify": out.model_dump(),
     }
 
-    log_node_exit("assess_verify", patch) # Logger
+    log_node_exit("assess_verify", {**patch, "messages": [raw]}) # Logger
     return patch

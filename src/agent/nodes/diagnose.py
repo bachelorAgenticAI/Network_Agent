@@ -84,11 +84,13 @@ def diagnose_node(state: AgentState, llm) -> dict:
     }
     log_node_enter("diagnose", ctx) # Logger
     msg = SystemMessage(content=SYSTEM + "\n\nCTX:\n" + json.dumps(ctx, ensure_ascii=False))
-    diag: Diagnosis = llm.with_structured_output(Diagnosis).invoke([msg])
+    result = llm.with_structured_output(Diagnosis, include_raw=True).invoke([msg])
+    diag: Diagnosis = result["parsed"]
+    raw = result["raw"]
 
     patch = {
         "observations": observations,
         "diagnosis": diag.model_dump(),
     }
-    log_node_exit("diagnose", patch) # Logger
+    log_node_exit("diagnose", {**patch, "messages": [raw]}) # Logger
     return patch

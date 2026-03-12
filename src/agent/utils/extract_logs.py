@@ -417,15 +417,7 @@ def build_extracted(entries: list[dict[str, Any]]) -> dict[str, Any]:
             "ended_at": monitor_out.get("ts", all_end.isoformat()),
         },
         "input_alert": input_alert,
-        "prediction": prediction,
         "prediction_history": prediction_history,
-        "plan": {
-            "intent": intent_out_data.get("intent"),
-            "intent_description": intent_out_data.get("intent_description"),
-            "problem": plan.get("problem") if isinstance(plan, dict) else None,
-            "fix_summary": plan.get("fix_summary") if isinstance(plan, dict) else None,
-            "steps": plan_steps if isinstance(plan_steps, list) else [],
-        },
         "plan_history": plan_history,
         "execution": {
             "verify": {
