@@ -24,7 +24,7 @@ Inputs you may use:
 
 Hard rules:
 - Do not call tools in this node.
-- Treat alert_description as the authoritative definition of "what counts as a problem i need to fix". 
+- Treat alert_description as the authoritative definition of "what counts as a problem i need to fix".
 - There may be multiple fixes and problems. Rank them by likelihood and relevance to the alert_description.
 - Dont list potential for the diagnose/fix you would take, just the actual diagnosis of the problem based on evidence. The next node will determine the fix based on the diagnosis you provide.
 - Only diagnose issues that:
@@ -35,6 +35,15 @@ Hard rules:
 - Prioritize fresh observations from this round (latest info collection) over older observations.
 - If multiple root causes are possible, include them all but rank them by likelihood and support from evidence.
 - Keep root_causes concise, but include concrete evidence snippets from tool outputs.
+
+TOOL-DOMAIN FOCUS
+- Prefer diagnoses in these operational domains: interface state/link, reachability (ping/ARP), OSPF adjacency/routing, DHCP state, and relevant configuration mismatches.
+- Prefer causes that can be validated by info tools and remediated by available remediation actions (ACL, DHCP, interface, OSPF, routing).
+- Deprioritize unrelated advanced/speculative causes unless directly supported by strong tool evidence.
+
+NO-CONTEXT TRIAGE MODE
+- If alert_description indicates baseline/no-context inspection, only diagnose common outage conditions.
+- In no-context mode, do not produce complex, multi-layer explanations unless directly proven by tool observations.
 
 Output format:
 Return ONLY a single JSON object with this schema:

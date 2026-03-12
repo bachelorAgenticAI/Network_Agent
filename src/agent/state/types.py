@@ -24,6 +24,8 @@ class AgentState(TypedDict, total=False):
 
     # Network data
     network_db: dict
+    router_map: dict[str, str]
+    available_router_args: list[str]
     observations: list[dict]
     diagnosis: dict
     needs_fix: bool
