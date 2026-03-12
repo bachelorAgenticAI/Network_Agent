@@ -232,6 +232,7 @@ async def main():
             print("\n[Monitoring] Running check...")
 
             alerts = await compare()
+
             if alerts:
                 thread_id += 1
                 config["configurable"]["thread_id"] = f"alert-{thread_id}"

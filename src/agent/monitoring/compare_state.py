@@ -16,6 +16,7 @@ CUSTOM_ALERT_FILE = MEMORY_DIR / "custom_alerts.json"  # <--- manual test
 ERROR_THRESHOLD = 50
 DROP_THRESHOLD = 50
 
+
 # Small helper to read JSON with a default fallback.
 def load_json(file_path, default=None):
     if not file_path.exists():
@@ -23,11 +24,13 @@ def load_json(file_path, default=None):
     with open(file_path) as f:
         return json.load(f)
 
+
 # Ensure parent folder exists before writing.
 def save_json(file_path, data):
     file_path.parent.mkdir(parents=True, exist_ok=True)
     with open(file_path, "w") as f:
         json.dump(data, f, indent=2)
+
 
 # Flatten state into {device: {interface_name: interface_data}} for quick diffs.
 def build_map(state):
@@ -37,13 +40,14 @@ def build_map(state):
         devices[device["device"]] = interfaces
     return devices
 
+
 # Load and clear custom alerts for test cases.
 def load_custom_alerts():
     if not CUSTOM_ALERT_FILE.exists():
         return []
     alerts = load_json(CUSTOM_ALERT_FILE, default=[])
-    CUSTOM_ALERT_FILE.unlink()  # remove after loading
     return alerts
+
 
 # Test mode: if custom alerts are provided, bypass live comparison.
 async def compare():
