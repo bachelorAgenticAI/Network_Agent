@@ -162,6 +162,160 @@ def _node_cycles(entries: list[dict[str, Any]]) -> dict[str, int]:
         cycles[node] = cycles.get(node, 0) + 1
     return cycles
 
+
+def _extract_plan_history(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    history: list[dict[str, Any]] = []
+
+    for entry in entries:
+        if entry.get("node") != "intent" or entry.get("direction") != "out":
+            continue
+
+        data = entry.get("data", {})
+        if not isinstance(data, dict):
+            continue
+
+        plan = data.get("plan", {})
+        if not isinstance(plan, dict) or not plan:
+            continue
+
+        raw_steps = plan.get("plan_steps", [])
+        steps = raw_steps if isinstance(raw_steps, list) else []
+
+        history.append(
+            {
+                "ts": entry.get("ts"),
+                "intent": data.get("intent"),
+                "intent_description": data.get("intent_description"),
+                "needs_fix": data.get("needs_fix"),
+                "problem": plan.get("problem"),
+                "fix_summary": plan.get("fix_summary"),
+                "steps": steps,
+                "step_count": len(steps),
+            }
+        )
+
+    return history
+
+
+def _normalize_prediction(
+    diagnosis: dict[str, Any], input_alert: dict[str, Any], needs_fix: Any = None
+) -> dict[str, Any]:
+    root_causes = diagnosis.get("root_causes", [])
+    if not isinstance(root_causes, list):
+        root_causes = []
+
+    primary_cause = root_causes[0] if root_causes else {}
+    primary_type = str(primary_cause.get("type", "")).strip()
+    issue_type = _normalize_issue_type(primary_type or str(primary_cause.get("cause", "unknown")))
+
+    return {
+        "detected": bool(root_causes),
+        "issue_type": issue_type,
+        "device": input_alert.get("device"),
+        "interface": input_alert.get("interface"),
+        "root_causes_ranked": [
+            {
+                "type": _normalize_issue_type(str(rc.get("type", ""))) if rc.get("type") else None,
+                "cause": _normalize_issue_type(str(rc.get("cause", "unknown"))),
+                "confidence": rc.get("confidence"),
+                "evidence": rc.get("evidence", []),
+            }
+            for rc in root_causes
+            if isinstance(rc, dict)
+        ],
+        "needs_fix": bool(needs_fix) if needs_fix is not None else None,
+    }
+
+
+def _extract_prediction_history(
+    entries: list[dict[str, Any]], input_alert: dict[str, Any]
+) -> list[dict[str, Any]]:
+    diagnose_events = [
+        e for e in entries if e.get("node") == "diagnose" and e.get("direction") == "out"
+    ]
+    intent_events = [
+        e
+        for e in entries
+        if e.get("node") == "intent"
+        and e.get("direction") == "out"
+        and isinstance(e.get("data"), dict)
+        and "needs_fix" in e.get("data", {})
+    ]
+
+    history: list[dict[str, Any]] = []
+    for idx, entry in enumerate(diagnose_events):
+        data = entry.get("data", {})
+        if not isinstance(data, dict):
+            continue
+
+        diagnosis = data.get("diagnosis", {})
+        if not isinstance(diagnosis, dict):
+            diagnosis = {}
+
+        needs_fix = None
+        if idx < len(intent_events):
+            intent_data = intent_events[idx].get("data", {})
+            if isinstance(intent_data, dict):
+                needs_fix = intent_data.get("needs_fix")
+
+        history.append(
+            {
+                "ts": entry.get("ts"),
+                **_normalize_prediction(diagnosis, input_alert, needs_fix),
+                "missing_info": diagnosis.get("missing_info", []),
+            }
+        )
+
+    return history
+
+
+def _extract_execution_history(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    history: list[dict[str, Any]] = []
+    seen_change_keys: set[str] = set()
+
+    for entry in entries:
+        if entry.get("node") != "collect_changes" or entry.get("direction") != "out":
+            continue
+
+        data = entry.get("data", {})
+        if not isinstance(data, dict):
+            continue
+
+        changes_raw = data.get("changes", [])
+        changes: list[dict[str, Any]] = []
+        if isinstance(changes_raw, list):
+            for change in changes_raw:
+                if not isinstance(change, dict):
+                    continue
+                changes.append(
+                    {
+                        "tool": change.get("tool"),
+                        "args": change.get("args", {}),
+                        "result": _extract_change_result(change.get("result")),
+                    }
+                )
+
+        new_changes: list[dict[str, Any]] = []
+        for change in changes:
+            change_key = json.dumps(change, sort_keys=True, ensure_ascii=False)
+            if change_key in seen_change_keys:
+                continue
+            seen_change_keys.add(change_key)
+            new_changes.append(change)
+
+        history.append(
+            {
+                "ts": entry.get("ts"),
+                "changes": new_changes,
+                "change_count": len(new_changes),
+                "total_change_count": len(changes),
+                "remediation_step_idx": data.get("remediation_step_idx"),
+                "remediation_done": data.get("remediation_done"),
+            }
+        )
+
+    return history
+
 # Build one structured run document from raw node enter/exit events.
 def build_extracted(entries: list[dict[str, Any]]) -> dict[str, Any]:
     if not entries:
@@ -172,7 +326,6 @@ def build_extracted(entries: list[dict[str, Any]]) -> dict[str, Any]:
 
     diagnose_out = _find(entries, "diagnose", "out", first=False) or {}
     intent_out_last = _find(entries, "intent", "out", first=False) or {}
-    collect_changes_out = _find(entries, "collect_changes", "out", first=False) or {}
     assess_verify_out = _find(entries, "assess_verify", "out", first=False) or {}
 
     monitor_in_data = monitor_in.get("data", {})
@@ -182,31 +335,14 @@ def build_extracted(entries: list[dict[str, Any]]) -> dict[str, Any]:
     diagnosis = diagnose_out.get("data", {}).get("diagnosis", {})
     if not isinstance(diagnosis, dict):
         diagnosis = {}
-    root_causes = diagnosis.get("root_causes", [])
-    if not isinstance(root_causes, list):
-        root_causes = []
-
-    primary_cause = root_causes[0] if root_causes else {}
-    primary_type = str(primary_cause.get("type", "")).strip()
-    issue_type = _normalize_issue_type(primary_type or str(primary_cause.get("cause", "unknown")))
 
     intent_out_data = intent_out_last.get("data", {})
     plan = intent_out_data.get("plan", {}) if isinstance(intent_out_data, dict) else {}
     plan_steps = plan.get("plan_steps", []) if isinstance(plan, dict) else []
-
-    changes_raw = collect_changes_out.get("data", {}).get("changes", [])
-    changes_out: list[dict[str, Any]] = []
-    if isinstance(changes_raw, list):
-        for change in changes_raw:
-            if not isinstance(change, dict):
-                continue
-            changes_out.append(
-                {
-                    "tool": change.get("tool"),
-                    "args": change.get("args", {}),
-                    "result": _extract_change_result(change.get("result")),
-                }
-            )
+    prediction = _normalize_prediction(diagnosis, input_alert, intent_out_data.get("needs_fix"))
+    prediction_history = _extract_prediction_history(entries, input_alert)
+    plan_history = _extract_plan_history(entries)
+    execution_history = _extract_execution_history(entries)
 
     verify = assess_verify_out.get("data", {}).get("verify", {})
     if not isinstance(verify, dict):
@@ -270,6 +406,7 @@ def build_extracted(entries: list[dict[str, Any]]) -> dict[str, Any]:
         or monitor_out.get("data", {}).get("thread_id")
         or "unknown"
     )
+    issue_type = prediction.get("issue_type", "unknown")
     test_case_id = f"tc_{_snake_case(str(input_alert.get('type', 'unknown')))}_{issue_type}_01"
 
     return {
@@ -280,37 +417,24 @@ def build_extracted(entries: list[dict[str, Any]]) -> dict[str, Any]:
             "ended_at": monitor_out.get("ts", all_end.isoformat()),
         },
         "input_alert": input_alert,
-        "prediction": {
-            "detected": bool(root_causes),
-            "issue_type": issue_type,
-            "device": input_alert.get("device"),
-            "interface": input_alert.get("interface"),
-            "root_causes_ranked": [
-                {
-                    "type": _normalize_issue_type(str(rc.get("type", "")))
-                    if rc.get("type")
-                    else None,
-                    "cause": _normalize_issue_type(str(rc.get("cause", "unknown"))),
-                    "confidence": rc.get("confidence"),
-                    "evidence": rc.get("evidence", []),
-                }
-                for rc in root_causes
-                if isinstance(rc, dict)
-            ],
-            "needs_fix": bool(intent_out_data.get("needs_fix")),
-        },
+        "prediction": prediction,
+        "prediction_history": prediction_history,
         "plan": {
             "intent": intent_out_data.get("intent"),
+            "intent_description": intent_out_data.get("intent_description"),
+            "problem": plan.get("problem") if isinstance(plan, dict) else None,
+            "fix_summary": plan.get("fix_summary") if isinstance(plan, dict) else None,
             "steps": plan_steps if isinstance(plan_steps, list) else [],
         },
+        "plan_history": plan_history,
         "execution": {
-            "changes": changes_out,
             "verify": {
                 "passed": bool(verify.get("passed")),
                 "evidence": _extract_verify_evidence_obj(verify),
                 "remaining_issues": verify.get("remaining_issues", []),
             },
         },
+        "execution_history": execution_history,
         "metrics_input": {
             "timings": {
                 "detect_s": detect_s,
@@ -326,6 +450,9 @@ def build_extracted(entries: list[dict[str, Any]]) -> dict[str, Any]:
                 "tool_calls_verify": tool_calls_verify,
                 "remediation_attempts": 1 if remediation_in else 0,
                 "plan_steps": len(plan_steps) if isinstance(plan_steps, list) else 0,
+                "diagnoses_created": len(prediction_history),
+                "plans_created": len(plan_history),
+                "execution_updates": len(execution_history),
             },
             "tokens": _sum_tokens(entries),
         },
