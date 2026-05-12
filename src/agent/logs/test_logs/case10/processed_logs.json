@@ -1,0 +1,147 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_oper_state_change_unknown_01",
+    "started_at": "2026-03-17T13:07:43.794679+00:00",
+    "ended_at": "2026-03-17T13:11:31.425470+00:00"
+  },
+  "input_alert": {
+    "type": "oper_state_change",
+    "device": "R2",
+    "interface": "Serial0/1/1",
+    "old_oper_state": "up",
+    "new_oper_state": "lower-layer-down",
+    "old_admin_state": "up",
+    "new_admin_state": "up"
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-03-17T13:09:36.084059+00:00",
+      "detected": false,
+      "issue_type": "unknown",
+      "device": "R2",
+      "interface": "Serial0/1/1",
+      "root_causes_ranked": [],
+      "needs_fix": true,
+      "missing_info": [
+        "Provide the exact interface state snapshots (output of \"show interfaces Serial0/1/1\" or equivalent) for R2 and R3 at the time the alert triggered and the current output; include admin/oper state, \"line protocol\" text, last-change timestamp, input/output/CRC errors, and last-clear time.",
+        "Provide syslog / event log lines from R2 and R3 spanning at least five minutes before and after the alert timestamp so we can see what caused the oper/admin state transitions (messages for line protocol, interface down/up, shutdown/no shutdown, or config changes).",
+        "Provide the running configuration for interface Serial0/1/1 on R2 and R3 (\"show running-config interface Serial0/1/1\") and any config-change/audit records (who/when committed) to confirm whether an admin shutdown or other config change was applied."
+      ]
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-03-17T13:10:08.997599+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "Serial0/1/1 on R2 moved from oper up to lower-layer-down while admin is up; Serial0/1/1 on R3 moved from oper up to down and admin set to down. Impact: point-to-point serial link between R2 and R3 is down causing loss of connectivity. Desired outcome: restore Serial0/1/1 on R2 and R3 to oper up with correct admin state so connectivity is resumed.",
+      "needs_fix": true,
+      "problem": "Point-to-point link Serial0/1/1 between router2 and router3 is down: router2 oper=lower-layer-down admin=up; router3 oper=down admin=down. Connectivity lost.",
+      "fix_summary": "Bring interface admin state to up on both endpoints to reinitialize the serial link: (1) issue no shutdown on router2 Serial0/1/1 (restarts line protocol negotiation) and (2) issue no shutdown on router3 Serial0/1/1 (undo admin down). Operational risk: temporary traffic interruption and possible interface flap during re-establishment.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "set_interface_admin_state",
+          "target": "Serial0/1/1",
+          "parameters": [
+            "no shutdown"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router3",
+          "action": "set_interface_admin_state",
+          "target": "Serial0/1/1",
+          "parameters": [
+            "no shutdown"
+          ]
+        }
+      ],
+      "step_count": 2
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-03-17T13:10:23.659149+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "Serial0/1/1",
+            "state": "up"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-03-17T13:10:35.451640+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router3",
+            "interface_name": "Serial0/1/1",
+            "state": "up"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 2,
+      "remediation_step_idx": 2,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 51.3,
+      "diagnose_s": 15.6,
+      "remediate_s": 25.6,
+      "verify_s": 41.2,
+      "total_s": 227.6
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 2,
+      "collect_changes": 2,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 8,
+      "tool_calls_pre_diagnosis": 3,
+      "tool_calls_remediation": 2,
+      "tool_calls_verify": 3,
+      "remediation_attempts": 2,
+      "plan_steps": 2,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 2
+    },
+    "tokens": {
+      "total_prompt_tokens": 32315,
+      "total_completion_tokens": 13060,
+      "total_tokens": 45375
+    }
+  }
+}

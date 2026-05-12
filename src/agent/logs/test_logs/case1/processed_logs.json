@@ -1,0 +1,165 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_oper_state_change_configuration_administrative_01",
+    "started_at": "2026-03-17T13:00:15.791047+00:00",
+    "ended_at": "2026-03-17T13:05:07.784561+00:00"
+  },
+  "input_alert": {
+    "type": "oper_state_change",
+    "device": "R1",
+    "interface": "Serial0/1/0",
+    "old_oper_state": "up",
+    "new_oper_state": "lower-layer-down",
+    "old_admin_state": "up",
+    "new_admin_state": "up"
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-03-17T13:03:01.772465+00:00",
+      "detected": true,
+      "issue_type": "configuration_administrative",
+      "device": "R1",
+      "interface": "Serial0/1/0",
+      "root_causes_ranked": [
+        {
+          "type": "configuration_administrative",
+          "cause": "r2_serial0_1_0_is_administratively_shut_which_removed_the_carrier_on_the_r1_r2_serial_link_and_caused_r1_serial0_1_0_to_move_to_lower_layer_down_while_remaining_admin_up",
+          "confidence": 0.95,
+          "evidence": [
+            "R2 running-config: Serial0/1/0 contains \"shutdown\" (get_running_config:R2).",
+            "R2 interface status: admin_state=\"down\", oper_state=\"down\", last_change=\"2026-03-15T10:33:14\" (get_interface_status:R2:Serial0/1/0).",
+            "R1 interface status: admin_state=\"up\", oper_state=\"lower-layer-down\" (get_interface_status:R1:Serial0/1/0).",
+            "OSPF: R2 Serial0/1/0 and R1 Serial0/1/0 show interface_state \"Down\" with no neighbors (get_ospf for R2 and R1)."
+          ]
+        },
+        {
+          "type": "physical_layer_possible_contributing",
+          "cause": "admin_shutdown",
+          "confidence": 0.6,
+          "evidence": [
+            "R1 interface status: input_errors=37, admin_state=\"up\", oper_state=\"lower-layer-down\", last_change=\"2026-03-17T14:00:53\" (get_interface_status:R1:Serial0/1/0)."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-03-17T13:03:30.706203+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "R2 Serial0/1/0 is administratively down, which removed carrier for the R1–R2 serial link causing R1 Serial0/1/0 to move to lower-layer-down and OSPF neighbor loss; R1 also shows input errors that may indicate a physical issue. Desired outcome: restore link carrier and OSPF adjacency, and clear R1 interface errors.",
+      "needs_fix": true,
+      "problem": "R2 Serial0/1/0 is administratively down, causing R1 Serial0/1/0 oper_state lower-layer-down and OSPF neighbor loss; R1 Serial0/1/0 has input errors.",
+      "fix_summary": "Re-enable R2 Serial0/1/0 (no shutdown) to restore link and OSPF; clear R1 Serial0/1/0 interface counters to remove input error counts. Risk: bringing R2 interface up may restore traffic if the shutdown was intentional.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "set_interface_admin_state",
+          "target": "Serial0/1/0",
+          "parameters": [
+            "no shutdown"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router1",
+          "action": "clear_interface_counters",
+          "target": "Serial0/1/0",
+          "parameters": [
+            "clear input counters"
+          ]
+        }
+      ],
+      "step_count": 2
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": [
+        "R1 Serial0/1/0 has input_errors=37 (interface counters were not cleared as planned)."
+      ]
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-03-17T13:03:46.978719+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "Serial0/1/0",
+            "state": "up"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-03-17T13:04:10.641301+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router1",
+            "interface_name": "Serial0/1/0",
+            "state": "up"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 2,
+      "remediation_step_idx": 2,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 43.5,
+      "diagnose_s": 41.8,
+      "remediate_s": 38.7,
+      "verify_s": 36.9,
+      "total_s": 292.0
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 2,
+      "collect_changes": 2,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 15,
+      "tool_calls_pre_diagnosis": 9,
+      "tool_calls_remediation": 2,
+      "tool_calls_verify": 4,
+      "remediation_attempts": 2,
+      "plan_steps": 2,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 2
+    },
+    "tokens": {
+      "total_prompt_tokens": 46762,
+      "total_completion_tokens": 15797,
+      "total_tokens": 62559
+    }
+  }
+}

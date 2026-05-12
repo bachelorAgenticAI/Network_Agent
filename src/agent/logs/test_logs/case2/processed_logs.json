@@ -1,0 +1,130 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_missing_incorrect_return_route_asymmetric_routing_01",
+    "started_at": "2026-03-17T13:52:34.181271+00:00",
+    "ended_at": "2026-03-17T13:55:29.614539+00:00"
+  },
+  "input_alert": {
+    "alert_type": "network_reachability",
+    "source_network": "192.168.0.12",
+    "destination_ip": "172.16.0.12",
+    "pings_sent": 25,
+    "pings_successful": 0
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-03-17T13:54:19.779771+00:00",
+      "detected": true,
+      "issue_type": "missing_incorrect_return_route_asymmetric_routing",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "missing_incorrect_return_route_asymmetric_routing",
+          "cause": "r2_has_no_route_for_the_192_168_0_0_24_network_so_replies_from_172_16_0_12_are_sent_via_r2_s_default_next_hop_toward_r3_instead_of_back_to_r1_causing_the_source_192_168_0_12_to_receive_no_replies",
+          "confidence": 0.9,
+          "evidence": [
+            "R1 routing: has explicit route for 172.16.0.0/24 via next-hop 10.0.0.2 (R2) — from R1 running-config: \"\\\"prefix\\\": \\\"172.16.0.0\\\", \\\"fwd-list\\\": [{ \\\"fwd\\\": \\\"10.0.0.2\\\" }]\"",
+            "R2 routing: no route for 192.168.0.0/24; only a default route forwarding to 10.0.0.6 (R3) — from R2 running-config: \"\\\"ip-route-interface-forwarding-list\\\": [{ \\\"prefix\\\": \\\"0.0.0.0\\\", \\\"fwd-list\\\": [{ \\\"fwd\\\": \\\"10.0.0.6\\\" }] }]\"",
+            "Interface addressing shows R1<->R2 link (R1 Serial0/1/0 = 10.0.0.1, R2 Serial0/1/0 = 10.0.0.2) so forward path (192.168.0.12 -> 172.16.0.12) uses R1->R2 but R2 will forward replies using its default (10.0.0.6) instead of back to R1 — R1 Serial address: \"10.0.0.1/30\"; R2 Serial: \"10.0.0.2/30\"; R2 Serial to R3: \"10.0.0.5/30\" and R3 side \"10.0.0.6/30\" (from running-configs)"
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-03-17T13:54:33.898528+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "Diagnose loss of reachability: source 192.168.0.12 cannot reach destination 172.16.0.12 (25 pings sent, 0 replies).",
+      "needs_fix": true,
+      "problem": "R2 has no route for 192.168.0.0/24; replies from 172.16.0.12 are forwarded toward R3 instead of back to R1, causing 192.168.0.12 to receive no replies.",
+      "fix_summary": "Add a static route on R2 for 192.168.0.0/24 with next-hop 10.0.0.1 (R1) so return traffic is forwarded to R1.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "add_static_route",
+          "target": "192.168.0.0/24",
+          "parameters": [
+            "next_hop=10.0.0.1",
+            "metric=1",
+            "description=Return-route-to-192.168.0.0/24-via-R1"
+          ]
+        }
+      ],
+      "step_count": 1
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {
+        "ping_10_0_0_2_success": true
+      },
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-03-17T13:54:41.829083+00:00",
+      "changes": [
+        {
+          "tool": "add_static_route",
+          "args": {
+            "router_name": "router2",
+            "network": "192.168.0.0",
+            "mask": "255.255.255.0",
+            "next_hop": "10.0.0.1"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 22.6,
+      "diagnose_s": 33.5,
+      "remediate_s": 7.1,
+      "verify_s": 37.2,
+      "total_s": 175.4
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 1,
+      "collect_changes": 1,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 13,
+      "tool_calls_pre_diagnosis": 9,
+      "tool_calls_remediation": 1,
+      "tool_calls_verify": 3,
+      "remediation_attempts": 1,
+      "plan_steps": 1,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 1
+    },
+    "tokens": {
+      "total_prompt_tokens": 35728,
+      "total_completion_tokens": 12904,
+      "total_tokens": 48632
+    }
+  }
+}

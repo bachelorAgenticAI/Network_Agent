@@ -1,0 +1,324 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_ospf_adjacency_misconfiguration_01",
+    "started_at": "2026-04-10T16:17:58.905813+00:00",
+    "ended_at": "2026-04-10T16:29:00.541237+00:00"
+  },
+  "input_alert": {
+    "alert_type": "network_reachability",
+    "source_network": "192.168.0.162",
+    "destination_ip": "172.16.0.11",
+    "event": "ping_timeout",
+    "pings_sent": 25,
+    "pings_successful": 0
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-04-10T16:20:35.003404+00:00",
+      "detected": true,
+      "issue_type": "misconfigured_routing_forwarding_loop",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "misconfigured_routing_forwarding_loop",
+          "cause": "both_r1_and_r3_have_static_routes_for_172_16_0_0_that_point_at_each_other_r1_10_0_0_9_r3_10_0_0_10_creating_a_forwarding_loop_blackhole_for_traffic_to_172_16_0_11",
+          "confidence": 0.9,
+          "evidence": [
+            "R1 running-config: routing ip-route-interface-forwarding-list entry for 172.16.0.0/24 with fwd 10.0.0.9",
+            "R3 running-config: routing ip-route-interface-forwarding-list entry for 172.16.0.0/24 with fwd 10.0.0.10"
+          ]
+        },
+        {
+          "type": "down_unreachable_intermediate_router_r2_missing_path",
+          "cause": "r2_is_not_reachable_from_r1_r1_shows_no_ospf_neighbor_on_the_r1_r2_interface_and_all_collections_from_r2_failed_so_the_likely_intended_path_to_the_172_16_0_0_24_network_via_r2_is_unavailable",
+          "confidence": 0.75,
+          "evidence": [
+            "R1 OSPF: Serial0/1/0 interface entry shows neighbors: [] (no OSPF neighbor on link to R2)",
+            "get_running_config:router2 returned error: \"All connection attempts failed\" (router2 collection failed)",
+            "Topology/config: R1 Serial0/1/0 configured as 10.0.0.1/30 (description: Link to R2)"
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": [
+        "Definitive location/attachment of 172.16.0.11 (which router/interface or host is authoritative for that IP?)",
+        "Running-config, interface status and OSPF adjacency outputs from router2 (collection previously failed) to confirm R2's state and routes",
+        "Traceroute (or R1/R3 packet-forwarding trace) to 172.16.0.11 from R1 and/or R3 to show actual forwarding path and whether packets loop between R1 and R3 or are forwarded toward R2"
+      ]
+    },
+    {
+      "ts": "2026-04-10T16:26:57.947411+00:00",
+      "detected": true,
+      "issue_type": "ospf_adjacency_misconfiguration",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "ospf_adjacency_misconfiguration",
+          "cause": "r1_and_r2_do_not_form_an_ospf_neighbor_on_the_10_0_0_0_30_link_because_the_link_is_placed_in_different_ospf_areas_on_each_router_area_mismatch_this_prevents_the_intended_r1_r2_path_for_172_16_0_0_24_from_being_learned_used",
+          "confidence": 0.95,
+          "evidence": [
+            "R1 running-config: ospf network statement includes 10.0.0.0 wildcard 0.0.0.3 area 0 (router-id 1.1.1.1).",
+            "R2 running-config: ospf network statement includes 10.0.0.0 wildcard 0.0.0.3 area 1 (router-id 2.2.2.2).",
+            "R1 OSPF state: Serial0/1/0 (toward R2) shows no neighbors (neighbors: []).",
+            "R2 OSPF state: Serial0/1/0 (toward R1) shows no neighbors (neighbors: [])."
+          ]
+        },
+        {
+          "type": "reciprocal_static_routes_forwarding_loop_historical_recently_remediated",
+          "cause": "reciprocal_static_routes_for_172_16_0_0_24_between_r1_and_r3_were_present_and_would_create_a_forwarding_loop_that_could_blackhole_traffic_the_tool_run_history_shows_those_static_routes_were_removed_and_r1_was_updated_to_point_172_16_0_0_10_0_0_2_so_the_loop_likely_existed_recently_but_has_been_partially_corrected_by_prior_changes",
+          "confidence": 0.6,
+          "evidence": [
+            "previous_changes: delete_static_route on router1 for 172.16.0.0/24 — result: success (\"Static route 172.16.0.0/255.255.255.0 deleted from R1\").",
+            "previous_changes: delete_static_route on router3 for 172.16.0.0/24 — result: success (\"Static route 172.16.0.0/255.255.255.0 deleted from R3\").",
+            "previous_changes: add_static_route on router1 172.16.0.0/24 via 10.0.0.2 — result: success (\"Static route 172.16.0.0/255.255.255.0 via 10.0.0.2 added to R1\").",
+            "Current R3 running-config: no 172.16.0.0 static route present (R3 routing only shows a 0.0.0.0/0 via Loopback1)."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-04-10T16:21:13.667117+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "Traffic from 192.168.0.162 to 172.16.0.11 is blackholed by a forwarding loop: R1 and R3 have reciprocal static routes for 172.16.0.0/24 pointing at each other; additionally the intended path via R2 is down (no OSPF neighbor). Desired outcome: break the loop, restore a correct route to 172.16.0.0/24 via R2, and re-establish R1–R2 adjacency so 192.168.0.162 can reach 172.16.0.11.",
+      "needs_fix": true,
+      "problem": "Reciprocal static routes on R1 and R3 create a forwarding loop/blackhole for 172.16.0.0/24; R2 path is currently unavailable (no OSPF neighbor on R1–R2).",
+      "fix_summary": "1) Remove the two incorrect static routes that point R1 and R3 at each other. 2) Add a corrective static route on R1 pointing 172.16.0.0/24 toward R2 (assumed next-hop 10.0.0.2). 3) Ensure R1 Serial0/1/0 is administratively up to restore adjacency to R2.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router1",
+          "action": "remove_static_route",
+          "target": "172.16.0.0/24 via 10.0.0.9",
+          "parameters": [
+            "route_protocol:static"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router3",
+          "action": "remove_static_route",
+          "target": "172.16.0.0/24 via 10.0.0.10",
+          "parameters": [
+            "route_protocol:static"
+          ]
+        },
+        {
+          "id": 3,
+          "device": "router1",
+          "action": "add_static_route",
+          "target": "172.16.0.0/24 via 10.0.0.2",
+          "parameters": [
+            "route_protocol:static",
+            "admin_distance:1",
+            "note:assumed-next-hop-10.0.0.2-if-R2-address-diff-update-as-needed"
+          ]
+        },
+        {
+          "id": 4,
+          "device": "router1",
+          "action": "set_interface_state",
+          "target": "Serial0/1/0",
+          "parameters": [
+            "up"
+          ]
+        }
+      ],
+      "step_count": 4
+    },
+    {
+      "ts": "2026-04-10T16:27:45.435888+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "R1 and R2 fail to form an OSPF adjacency because the 10.0.0.0/30 link is in area 0 on R1 and area 1 on R2, preventing R2 from learning/advertising 172.16.0.0/24 and causing traffic from 192.168.0.162 to 172.16.0.11 to be blackholed. Desired outcome: correct OSPF area mismatch, bring the R1–R2 adjacency up, and restore a correct route to 172.16.0.0/24 via R2.",
+      "needs_fix": true,
+      "problem": "OSPF area mismatch on the 10.0.0.0/30 link between router1 and router2 prevents adjacency; traffic to 172.16.0.0/24 is blackholed.",
+      "fix_summary": "Change router2's 10.0.0.0/30 interface (Serial0/1/0) to OSPF area 0 to match router1 and ensure the interface is administratively up. This will form the R1–R2 adjacency and allow R2 to learn/advertise 172.16.0.0/24. Risk: transient routing/traffic disruption during adjacency formation and SPF recalculation.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "set_interface_ospf_area",
+          "target": "Serial0/1/0",
+          "parameters": [
+            "ospf_process=1",
+            "area=0"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router2",
+          "action": "set_interface_state",
+          "target": "Serial0/1/0",
+          "parameters": [
+            "state=up"
+          ]
+        }
+      ],
+      "step_count": 2
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-04-10T16:21:25.718059+00:00",
+      "changes": [
+        {
+          "tool": "delete_static_route",
+          "args": {
+            "router_name": "router1",
+            "network": "172.16.0.0",
+            "mask": "255.255.255.0"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-04-10T16:21:35.675382+00:00",
+      "changes": [
+        {
+          "tool": "delete_static_route",
+          "args": {
+            "router_name": "router3",
+            "network": "172.16.0.0",
+            "mask": "255.255.255.0"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 2,
+      "remediation_step_idx": 2,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-04-10T16:21:41.361379+00:00",
+      "changes": [
+        {
+          "tool": "add_static_route",
+          "args": {
+            "router_name": "router1",
+            "network": "172.16.0.0",
+            "mask": "255.255.255.0",
+            "next_hop": "10.0.0.2"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 3,
+      "remediation_step_idx": 3,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-04-10T16:21:48.171805+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router1",
+            "interface_name": "Serial0/1/0",
+            "state": "up"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 4,
+      "remediation_step_idx": 4,
+      "remediation_done": true
+    },
+    {
+      "ts": "2026-04-10T16:28:01.061869+00:00",
+      "changes": [
+        {
+          "tool": "add_ospf_network",
+          "args": {
+            "router_name": "router2",
+            "process_id": 1,
+            "ip_network": "10.0.0.0",
+            "wildcard": "0.0.0.3",
+            "area": 0
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 5,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-04-10T16:28:07.485197+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "Serial0/1/0",
+            "state": "up"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 6,
+      "remediation_step_idx": 2,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 115.1,
+      "diagnose_s": 124.0,
+      "remediate_s": 53.1,
+      "verify_s": 96.7,
+      "total_s": 661.6
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 4,
+      "get_info": 2,
+      "format_network": 2,
+      "diagnose": 2,
+      "remediation": 6,
+      "collect_changes": 6,
+      "verify": 2,
+      "assess_verify": 2,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 29,
+      "tool_calls_pre_diagnosis": 12,
+      "tool_calls_remediation": 6,
+      "tool_calls_verify": 11,
+      "remediation_attempts": 6,
+      "plan_steps": 2,
+      "diagnoses_created": 2,
+      "plans_created": 2,
+      "execution_updates": 6
+    },
+    "tokens": {
+      "total_prompt_tokens": 118795,
+      "total_completion_tokens": 41729,
+      "total_tokens": 160524
+    }
+  }
+}

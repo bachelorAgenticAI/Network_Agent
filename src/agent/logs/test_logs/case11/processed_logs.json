@@ -1,0 +1,157 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_unknown_01",
+    "started_at": "2026-03-17T13:13:14.594740+00:00",
+    "ended_at": "2026-03-17T13:17:55.632037+00:00"
+  },
+  "input_alert": {
+    "alert_type": "network_reachability",
+    "source_network": "192.168.0.12",
+    "destination_ip": "172.16.0.12",
+    "pings_sent": 25,
+    "pings_successful": 0
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-03-17T13:15:47.251695+00:00",
+      "detected": false,
+      "issue_type": "unknown",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [],
+      "needs_fix": true,
+      "missing_info": [
+        "Confirm both end-hosts are up and configured with the expected IP and gateway (192.168.0.12/24 gw 192.168.0.1 and 172.16.0.12/24 gw 172.16.0.1). Are either host firewalls blocking ICMP?",
+        "Provide show ip interface brief (or equivalent) for R1 and R2 to confirm interface states (G0/0/0 and Serial0/1/0) and that R1 G0/0/0 and R2 G0/0/0 are up/up.",
+        "Provide show ip route on R1 and R2 (routing tables) to confirm routes to 172.16.0.0/24 and 192.168.0.0/24 are present and next-hops are as expected.",
+        "Provide show ip ospf neighbor (or routing protocol neighbor status) on R1 and R2 to confirm OSPF adjacency/LSDB exchange is established.",
+        "Provide show ip arp on R1 and R2 (or ARP table on the gateways) to confirm the routers have ARP entries for the hosts (192.168.0.12 and 172.16.0.12).",
+        "If possible, provide traceroute from 192.168.0.12 to 172.16.0.12 or pings from R1 to 172.16.0.12 and from R2 to 192.168.0.12 to show where packets are being dropped."
+      ]
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-03-17T13:16:23.835424+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "Host 192.168.0.12 cannot reach 172.16.0.12 (25 pings sent, 0 successful). Restore IP reachability so pings succeed between the two subnets.",
+      "needs_fix": true,
+      "problem": "No IP-level reachability from 192.168.0.12 to 172.16.0.12 — routers lack routes between 192.168.0.0/24 and 172.16.0.0/24 (diagnostic outputs missing).",
+      "fix_summary": "Add reciprocal static routes on the edge routers so each router has a route to the other's LAN (172.16.0.0/24 and 192.168.0.0/24).",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router1",
+          "action": "add_static_route",
+          "target": "172.16.0.0/24",
+          "parameters": [
+            "172.16.0.0/24",
+            "172.16.0.1"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router2",
+          "action": "add_static_route",
+          "target": "192.168.0.0/24",
+          "parameters": [
+            "192.168.0.0/24",
+            "192.168.0.1"
+          ]
+        }
+      ],
+      "step_count": 2
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {
+        "ping_10_0_0_2_success": true
+      },
+      "remaining_issues": [
+        "End-host reachability (192.168.0.12 <-> 172.16.0.12) has not been verified from the hosts themselves — need host-level pings/traceroute to confirm full end-to-end connectivity.",
+        "Confirm host interface/gateway configuration and potential host firewall settings that could block ICMP or other traffic."
+      ]
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-03-17T13:16:32.945181+00:00",
+      "changes": [
+        {
+          "tool": "add_static_route",
+          "args": {
+            "router_name": "router1",
+            "network": "172.16.0.0",
+            "mask": "255.255.255.0",
+            "next_hop": "172.16.0.1"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-03-17T13:16:44.694319+00:00",
+      "changes": [
+        {
+          "tool": "add_static_route",
+          "args": {
+            "router_name": "router2",
+            "network": "192.168.0.0",
+            "mask": "255.255.255.0",
+            "next_hop": "192.168.0.1"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 2,
+      "remediation_step_idx": 2,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 48.7,
+      "diagnose_s": 34.0,
+      "remediate_s": 19.2,
+      "verify_s": 59.3,
+      "total_s": 281.0
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 2,
+      "collect_changes": 2,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 11,
+      "tool_calls_pre_diagnosis": 3,
+      "tool_calls_remediation": 2,
+      "tool_calls_verify": 6,
+      "remediation_attempts": 2,
+      "plan_steps": 2,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 2
+    },
+    "tokens": {
+      "total_prompt_tokens": 48271,
+      "total_completion_tokens": 16635,
+      "total_tokens": 64906
+    }
+  }
+}

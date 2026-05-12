@@ -1,0 +1,242 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_unidirectional_connectivity_rx_loss_on_r2_serial0_1_0_01",
+    "started_at": "2026-03-17T10:19:38.493536+00:00",
+    "ended_at": "2026-03-17T10:26:17.422500+00:00"
+  },
+  "input_alert": {
+    "alert_type": "routing_adjacency",
+    "device": "R2",
+    "protocol": "OSPF",
+    "status": "down"
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-03-17T10:23:06.409516+00:00",
+      "detected": true,
+      "issue_type": "unidirectional_connectivity_rx_loss_on_r2_serial0_1_0",
+      "device": "R2",
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "unidirectional_connectivity_rx_loss_on_r2_serial0_1_0",
+          "cause": "r2_is_not_receiving_or_processing_ospf_hellos_from_r1_on_the_serial0_1_0_link_so_r1_progresses_to_init_while_r2_reports_no_neighbor_preventing_adjacency_completion",
+          "confidence": 0.9,
+          "evidence": [
+            "router1: Serial0/1/0 sees neighbor 2.2.2.2 @10.0.0.2 state ospf-nbr-init (shows R1 has seen R2's Hellos but adjacency stuck at INIT).",
+            "router2: Serial0/1/0 present in OSPF but no neighbors reported in this snapshot (R2 reports no neighbor on that interface).",
+            "router3 adjacencies and R2<>R3 link are full, indicating R2's OSPF process is otherwise functional and the problem is localized to the R1<->R2 link."
+          ]
+        },
+        {
+          "type": "inbound_packet_filtering_acl_firewall_on_r2_blocking_ospf_from_r1",
+          "cause": "an_access_control_rule_or_filtering_on_r2_could_be_dropping_or_rejecting_ospf_hello_lsa_packets_from_r1_producing_the_observed_asymmetry_r1_sees_r2_r2_sees_no_neighbor",
+          "confidence": 0.6,
+          "evidence": [
+            "Asymmetric neighbor visibility: router1 shows neighbor on Serial0/1/0 in INIT, while router2 shows no neighbor on the same interface—consistent with R2 not receiving/accepting OSPF packets from R1.",
+            "R2 forms full adjacency with R3 on a different serial interface, implying OSPF is enabled and working generally on R2 (points to a localized policy/filter on the R1-facing interface)."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": [
+        "show interface Serial0/1/0 on router2 (status, IP, input/output packet counters, CRC/errors) and same on router1 for the link",
+        "show ip ospf interface Serial0/1/0 (and running-config for that interface) on both router1 and router2 to confirm OSPF timers, authentication, and network type",
+        "show running-config / show access-lists or any interface ACLs applied inbound on router2 Serial0/1/0"
+      ]
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-03-17T10:23:50.658437+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "OSPF adjacency on device R2 is down on Serial0/1/0 (R2 not receiving OSPF Hellos from R1). Impact: routes are not exchanged with R1. Desired outcome: restore the OSPF adjacency and resume route propagation.",
+      "needs_fix": true,
+      "problem": "R2 Serial0/1/0 is not receiving OSPF Hellos from R1 (RX loss or inbound filtering), preventing adjacency formation.",
+      "fix_summary": "On router2 Serial0/1/0: remove any inbound ACL that could block OSPF, reset the interface to clear RX state, and ensure OSPF interface parameters are set to standard values (point-to-point network, hello/dead timers 10/40).",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "remove_interface_acl_inbound",
+          "target": "Serial0/1/0",
+          "parameters": [
+            "acl_name=ACL_IN_S0_1_0"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router2",
+          "action": "shutdown_interface",
+          "target": "Serial0/1/0",
+          "parameters": []
+        },
+        {
+          "id": 3,
+          "device": "router2",
+          "action": "no_shutdown_interface",
+          "target": "Serial0/1/0",
+          "parameters": []
+        },
+        {
+          "id": 4,
+          "device": "router2",
+          "action": "set_ospf_network_type",
+          "target": "Serial0/1/0",
+          "parameters": [
+            "network_type=point-to-point"
+          ]
+        },
+        {
+          "id": 5,
+          "device": "router2",
+          "action": "set_ospf_interface_timers",
+          "target": "Serial0/1/0",
+          "parameters": [
+            "hello=10",
+            "dead=40"
+          ]
+        }
+      ],
+      "step_count": 5
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-03-17T10:24:07.812329+00:00",
+      "changes": [
+        {
+          "tool": "detach_acl_from_interface",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "Serial0/1/0",
+            "direction": "in"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-03-17T10:24:27.394769+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "Serial0/1/0",
+            "state": "down"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 2,
+      "remediation_step_idx": 2,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-03-17T10:24:39.480569+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "Serial0/1/0",
+            "state": "up"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 3,
+      "remediation_step_idx": 3,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-03-17T10:25:01.191159+00:00",
+      "changes": [
+        {
+          "tool": "create_ospf_process",
+          "args": {
+            "router_name": "router2",
+            "process_id": 1,
+            "router_id": "2.2.2.2"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 4,
+      "remediation_step_idx": 4,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-03-17T10:25:17.756122+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_ospf_cost",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "Serial0/1/0",
+            "cost": 49
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 5,
+      "remediation_step_idx": 5,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 63.5,
+      "diagnose_s": 69.0,
+      "remediate_s": 83.3,
+      "verify_s": 44.7,
+      "total_s": 398.9
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 5,
+      "collect_changes": 5,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 12,
+      "tool_calls_pre_diagnosis": 3,
+      "tool_calls_remediation": 5,
+      "tool_calls_verify": 4,
+      "remediation_attempts": 5,
+      "plan_steps": 5,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 5
+    },
+    "tokens": {
+      "total_prompt_tokens": 54276,
+      "total_completion_tokens": 21379,
+      "total_tokens": 75655
+    }
+  }
+}
