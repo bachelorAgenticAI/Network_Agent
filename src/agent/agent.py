@@ -32,7 +32,7 @@ def _route_from_controller(state: AgentState) -> str:
     v = state.get("verify") or {}
     # Only retry after verification failure if we're past initial phase
     if state.get("phase") != "start" and v.get("passed") is False:
-        if int(state.get("attempts", 0)) >= 2:  # set value for retry limit
+        if int(state.get("attempts", 0)) >= 1:  # set value for retry limit
             return "summary"
         return "get_info"
 
@@ -56,7 +56,7 @@ def _after_verify_assess(state: AgentState) -> str:
     v = state.get("verify") or {}
     if v.get("passed") is True:
         return "summary"
-    if int(state.get("attempts", 0)) >= 2:  # set value for retry limit 2=3 rounds
+    if int(state.get("attempts", 0)) >= 1:  # set value for retry limit 1=2 rounds
         return "summary"
     return "intent"
 

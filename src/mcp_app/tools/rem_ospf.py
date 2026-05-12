@@ -3,7 +3,7 @@ from mcp_app.utils.routers import get_router
 
 
 # Create or update an OSPF process with optional Router-ID
-async def configure_ospf_process(router_name: str, process_id: int, router_id: str = None) -> dict:
+async def create_ospf_process(router_name: str, process_id: int, router_id: str = None) -> dict:
 
     router = get_router(router_name)
     path = f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/router/Cisco-IOS-XE-ospf:router-ospf/ospf/process-id={process_id}"
@@ -162,9 +162,59 @@ async def disable_ospf_default_information_originate(router_name: str, process_i
             return {"status": "error", "message": str(e)}
 
 
+# Delete a specific network statement from an OSPF process safely
+async def delete_ospf_network(
+    router_name: str, process_id: int, ip_network: str, wildcard: str
+) -> dict:
+    from mcp_app.utils.common import get_client
+    from mcp_app.utils.routers import get_router
+
+    router = get_router(router_name)
+    process_path = f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/router/Cisco-IOS-XE-ospf:router-ospf/ospf/process-id={process_id}"
+
+    async with get_client(router) as client:
+        try:
+            # Step 1: GET the current OSPF process
+            r = await client.get(process_path)
+            r.raise_for_status()
+            data = r.json()
+            process_data = data.get("Cisco-IOS-XE-ospf:process-id", {})
+            current_networks = process_data.get("network", [])
+
+            # Step 2: Remove the network to delete
+            new_networks = [
+                net
+                for net in current_networks
+                if not (net.get("ip") == ip_network and net.get("wildcard") == wildcard)
+            ]
+
+            # Step 3: DELETE the entire OSPF process
+            del_resp = await client.delete(process_path)
+            del_resp.raise_for_status()
+
+            # Step 4: Recreate the OSPF process with remaining networks
+            payload = {
+                "Cisco-IOS-XE-ospf:process-id": {
+                    "id": process_id,
+                    "router-id": process_data.get("router-id"),
+                    "network": new_networks,
+                }
+            }
+            put_resp = await client.put(process_path, json=payload)
+            put_resp.raise_for_status()
+
+            return {
+                "status": "success",
+                "message": f"Network {ip_network} removed from OSPF process {process_id}.",
+            }
+
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+
 def rem_ospf_tools(mcp):
     mcp.tool(description=("Create or update OSPF process settings, including optional Router-ID."))(
-        configure_ospf_process
+        create_ospf_process
     )
     mcp.tool(description=("Delete an entire OSPF process and its process-level configuration."))(
         delete_ospf_process
@@ -186,3 +236,8 @@ def rem_ospf_tools(mcp):
     mcp.tool(description=("Disable 'default-information originate' under an OSPF process."))(
         disable_ospf_default_information_originate
     )
+    mcp.tool(
+        description=(
+            "Delete a specific OSPF network statement from a process while preserving other networks."
+        )
+    )(delete_ospf_network)

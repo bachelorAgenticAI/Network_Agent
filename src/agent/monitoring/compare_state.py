@@ -1,5 +1,3 @@
-"""Compare previous and current network snapshots and emit alerts for meaningful changes."""
-
 import asyncio
 import json
 import logging
@@ -11,10 +9,13 @@ MEMORY_DIR = Path(__file__).resolve().parent.parent / "memory"
 STATE_FILE = MEMORY_DIR / "last_state.json"
 ALERT_FILE = MEMORY_DIR / "alerts.json"
 INCIDENT_FILE = MEMORY_DIR / "incidents.json"
-CUSTOM_ALERT_FILE = MEMORY_DIR / "custom_alerts.json"  # <--- manual test
+CUSTOM_ALERT_FILE = MEMORY_DIR / "custom_alerts.json"  # Manual test
 
-ERROR_THRESHOLD = 50
-DROP_THRESHOLD = 50
+ERROR_THRESHOLD = (
+    10  # Alert if input_errors or output_errors increase by this amount since last check.
+)
+DROP_THRESHOLD = 10  # Alert if error or drop counters increase by this amount since last check.
+
 
 # Small helper to read JSON with a default fallback.
 def load_json(file_path, default=None):
@@ -23,11 +24,13 @@ def load_json(file_path, default=None):
     with open(file_path) as f:
         return json.load(f)
 
+
 # Ensure parent folder exists before writing.
 def save_json(file_path, data):
     file_path.parent.mkdir(parents=True, exist_ok=True)
     with open(file_path, "w") as f:
         json.dump(data, f, indent=2)
+
 
 # Flatten state into {device: {interface_name: interface_data}} for quick diffs.
 def build_map(state):
@@ -37,13 +40,14 @@ def build_map(state):
         devices[device["device"]] = interfaces
     return devices
 
+
 # Load and clear custom alerts for test cases.
 def load_custom_alerts():
     if not CUSTOM_ALERT_FILE.exists():
         return []
     alerts = load_json(CUSTOM_ALERT_FILE, default=[])
-    CUSTOM_ALERT_FILE.unlink()  # remove after loading
     return alerts
+
 
 # Test mode: if custom alerts are provided, bypass live comparison.
 async def compare():
@@ -72,23 +76,17 @@ async def compare():
             key = f"{device}:{name}"
             incident = updated_incidents.get(key)
 
-            # New interface appeared since previous snapshot.
+            # Skip new interfaces; do not alert for them
             if not old_intf:
-                alerts.append(
-                    {
-                        "type": "interface_new",
-                        "device": device,
-                        "interface": name,
-                        "new_oper_state": new_intf.get("oper_state"),
-                    }
-                )
-                updated_incidents[key] = {"active": True}
                 continue
 
             old_oper = old_intf.get("oper_state")
             new_oper = new_intf.get("oper_state")
 
-            # Operational state changed (for example up -> down).
+            old_admin = old_intf.get("admin_state")
+            new_admin = new_intf.get("admin_state")
+
+            # Operational state changed (alert trigger)
             if old_oper != new_oper:
                 if incident:
                     updated_incidents.pop(key, None)
@@ -98,8 +96,10 @@ async def compare():
                             "type": "oper_state_change",
                             "device": device,
                             "interface": name,
-                            "old_state": old_oper,
-                            "new_state": new_oper,
+                            "old_oper_state": old_oper,
+                            "new_oper_state": new_oper,
+                            "old_admin_state": old_admin,
+                            "new_admin_state": new_admin,
                         }
                     )
                     updated_incidents[key] = {"active": True}
@@ -137,7 +137,7 @@ def print_alerts(alerts):
         print("\n=== ALERT SUMMARY ===")
         print("No alerts detected\n")
         return
-    # Format a simple table of alerts for quick review in cli.
+    # Format a simple table of alerts for quick review in CLI.
     print("\n=== ALERT SUMMARY ===\n")
 
     header = f"{'DEVICE':20} {'INTERFACE':20} {'TYPE':25} DETAILS"
@@ -156,6 +156,7 @@ def print_alerts(alerts):
     print()
 
 
+# Can run as a standalone aswell for testing purposes
 if __name__ == "__main__":
     alerts = asyncio.run(compare())
     if alerts:

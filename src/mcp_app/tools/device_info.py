@@ -23,6 +23,7 @@ async def get_running_config(router_name: str) -> dict:
                 "ios_xe_version": data.get("version"),
                 "interfaces": data.get("interface"),
                 "routing": data.get("ip", {}).get("route"),
+                "ospf": data.get("router", {}).get("Cisco-IOS-XE-ospf:router-ospf", {}).get("ospf"),
                 "access_lists": data.get("ip", {}).get("access-list"),
                 "users": data.get("username"),
                 "license": data.get("license", {}).get("udi"),

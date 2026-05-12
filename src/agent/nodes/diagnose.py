@@ -41,12 +41,14 @@ Return ONLY a single JSON object with this schema:
 If no root cause can be supported, set root_causes to [] and populate missing_info with the minimum questions needed.
 """
 
+
 # Safely convert a value to a JSON string and limit its size for prompts.
 def _is_tool_related(m):
     # Keep only messages tied to tool execution (tool calls and tool outputs).
     return isinstance(m, ToolMessage) or (
         isinstance(m, AIMessage) and (getattr(m, "tool_calls", None) or [])
     )
+
 
 # This node gather tool-related observations from the most recent info-gathering round and generates a structured diagnosis.
 def diagnose_node(state: AgentState, llm) -> dict:
@@ -82,13 +84,15 @@ def diagnose_node(state: AgentState, llm) -> dict:
         "observations": observations,
         "previous_changes": state.get("changes") or [],
     }
-    log_node_enter("diagnose", ctx) # Logger
+    log_node_enter("diagnose", ctx)  # Logger
     msg = SystemMessage(content=SYSTEM + "\n\nCTX:\n" + json.dumps(ctx, ensure_ascii=False))
-    diag: Diagnosis = llm.with_structured_output(Diagnosis).invoke([msg])
+    result = llm.with_structured_output(Diagnosis, include_raw=True).invoke([msg])
+    diag: Diagnosis = result["parsed"]
+    raw = result["raw"] # Used for logging/debugging; not stored in state.
 
     patch = {
         "observations": observations,
         "diagnosis": diag.model_dump(),
     }
-    log_node_exit("diagnose", patch) # Logger
+    log_node_exit("diagnose", {**patch, "messages": [raw]}) # Logger
     return patch

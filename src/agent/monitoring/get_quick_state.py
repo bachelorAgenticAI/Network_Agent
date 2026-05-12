@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 from mcp_app.tools.device_info import get_running_config
-from mcp_app.tools.interface_router import get_interface_status
+from mcp_app.tools.interface import get_interface_status
 from mcp_app.utils.routers import ROUTERS
 
 

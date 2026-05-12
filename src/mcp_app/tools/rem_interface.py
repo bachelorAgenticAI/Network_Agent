@@ -212,7 +212,9 @@ async def set_interface_description(
 
 
 def rem_interface_tools(mcp):
-    mcp.tool(description=("Administratively enable or disable an interface. "))(set_interface_state)
+    mcp.tool(description=("Administratively enable or disable an interface. State:'up' or 'down'"))(
+        set_interface_state
+    )
 
     mcp.tool(description=("Configure primary IPv4 address on an interface."))(configure_interface)
 

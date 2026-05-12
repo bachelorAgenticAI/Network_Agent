@@ -16,8 +16,10 @@ ROLE
 You classify intent and decide whether remediation is required.
 You are the only node that authorizes changes.
 You may make reasonable assumptions about incomplete input and translate a high-level request into the necessary configuration steps.
+Be concise; report only what needs to be fixed. Specify exactly what must be fixed, as precisely as possible. Do not include explanations or justifications.
 For optional fields such as names, descriptions, or labels:
 - use the values from the alerts when provided; otherwise generate reasonable defaults.
+DO NOT invent tools.
 DECISION FLOW
 
 1. Diagnosis Handling
@@ -75,12 +77,16 @@ PLAN RULES (only if plan is created)
   - Make reasonable assumptions and still produce a remediation plan.
   - Place missing details in diagnosis.missing_info.
   - If new diagnosis remains consistent with previous diagnosis, you may reuse previously failed plan steps that are still relevant.
-- If needs_fix = True, plan_steps must not be empty.
+  - If needs_fix = True, plan_steps must not be empty.
+- If plan is not fixed first attempt:
+  - Do not get caught up in the right way to fix the problem. The goal is to find a solution that works, not the best solution.
+  - Use the tools at your disposal creatively to identify possible workarounds (e.g., quick fixes that keep services running).
 - Do not create plans for minor or unrelated findings in diagnosis.
 
 OUTPUT
 Return pure JSON that matches the required schema.
 """
+
 
 # This node determines the intent from the alert and after diagnosis is available, decides whether remediation is needed and generates a plan.
 def intent_node(state: AgentState, llm) -> dict:
@@ -98,11 +104,13 @@ def intent_node(state: AgentState, llm) -> dict:
         "Previous_changes": state.get("changes") or [],
         "number_of_attempts": state.get("attempts", 0),
     }
-    log_node_enter("intent", ctx) # Logger
+    log_node_enter("intent", ctx)  # Logger
 
     # IntentOut gives typed control fields used for graph routing.
     msg = SystemMessage(content=SYSTEM + "\n\nSTATE:\n" + json.dumps(ctx, ensure_ascii=False))
-    out: IntentOut = llm.with_structured_output(IntentOut).invoke([msg])
+    result = llm.with_structured_output(IntentOut, include_raw=True).invoke([msg])
+    out: IntentOut = result["parsed"]
+    raw = result["raw"]
 
     updates: dict = {
         "intent": out.intent,
@@ -122,7 +130,7 @@ def intent_node(state: AgentState, llm) -> dict:
             updates["needs_fix"] = False
             updates["plan"] = {}
             updates["phase"] = "have_diagnosis"
-            log_node_exit("intent", updates) # Logger
+            log_node_exit("intent", {**updates, "messages": [raw]})  # Logger
             return updates
 
         updates["needs_fix"] = bool(out.needs_fix) if out.needs_fix is not None else True
@@ -135,5 +143,5 @@ def intent_node(state: AgentState, llm) -> dict:
 
         updates["phase"] = "have_diagnosis"
 
-    log_node_exit("intent", updates) # Logger
+    log_node_exit("intent", {**updates, "messages": [raw]})  # Logger
     return updates

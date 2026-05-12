@@ -17,8 +17,12 @@ Rules:
 - passed=True only if the verification actually shows that the designated problem is gone.
 - Passed=false if verification shows the problem is still there OR if evidence is missing/inconclusive.
 - If evidence is missing or inconclusive, set passed=False and populate missing_info.
+- There is no mechanism to verify host-to-host connectivity; therefore, the absence of such verification must not be interpreted as a failure
+- You may say that a problem is fixed if a temporary workaround is in place that mitigates the issue, even if the root cause is not fully resolved. 
+- The goal is to ensure the system is in a good state, not necessarily to fix the underlying problem on the first run.
 Return structured output.
 """
+
 
 # Extract tool-related messages from the most recent verification round. If none, fallback to latest global tool messages.
 def _extract_recent_verify_tool_msgs(state: AgentState, limit: int = 30) -> list[dict]:
@@ -73,6 +77,7 @@ def _extract_recent_verify_tool_msgs(state: AgentState, limit: int = 30) -> list
 
     return list(reversed(toolish))
 
+
 # This node assesses whether verification passed based on recent tool outputs and sets up state for the next step.
 def assess_verify_node(state: AgentState, llm) -> dict:
     print("Assessing verification results...")
@@ -87,15 +92,17 @@ def assess_verify_node(state: AgentState, llm) -> dict:
         "network_db": db,
     }
 
-    log_node_enter("assess_verify", ctx) # Logger
+    log_node_enter("assess_verify", ctx)  # Logger
 
     # The LLM returns typed VerifyResult so downstream nodes can route safely.
     msg = SystemMessage(content=SYSTEM + "\n\nCTX:\n" + json.dumps(ctx, ensure_ascii=False))
-    out: VerifyResult = llm.with_structured_output(VerifyResult).invoke([msg])
+    result = llm.with_structured_output(VerifyResult, include_raw=True).invoke([msg])
+    out: VerifyResult = result["parsed"]
+    raw = result["raw"]  # Used for logging/debugging; not stored in state.
 
     patch = {
         "verify": out.model_dump(),
     }
 
-    log_node_exit("assess_verify", patch) # Logger
+    log_node_exit("assess_verify", {**patch, "messages": [raw]})  # Logger
     return patch

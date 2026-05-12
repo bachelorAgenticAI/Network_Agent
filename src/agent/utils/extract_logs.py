@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -150,6 +152,41 @@ def _tool_calls_count(entry: dict[str, Any] | None) -> int:
             total += len(tool_calls)
     return total
 
+
+def _entries_for(
+    entries: list[dict[str, Any]], node: str, direction: str
+) -> list[dict[str, Any]]:
+    return [
+        e for e in entries if e.get("node") == node and e.get("direction") == direction
+    ]
+
+
+def _sum_paired_durations(
+    entries: list[dict[str, Any]], start_node: str, end_node: str | None = None
+) -> float:
+    end_node = end_node or start_node
+    starts = _entries_for(entries, start_node, "in")
+    ends = _entries_for(entries, end_node, "out")
+
+    total_seconds = 0.0
+    for start, end in zip(starts, ends):
+        delta = (_parse_ts(end["ts"]) - _parse_ts(start["ts"])).total_seconds()
+        if delta > 0:
+            total_seconds += delta
+
+    return round(total_seconds, 1)
+
+
+def _sum_tool_calls_for_nodes(entries: list[dict[str, Any]], nodes: set[str]) -> int:
+    total = 0
+    for entry in entries:
+        if entry.get("direction") != "out":
+            continue
+        if entry.get("node") not in nodes:
+            continue
+        total += _tool_calls_count(entry)
+    return total
+
 # Number of times each node ran in this incident (based on "in" events).
 def _node_cycles(entries: list[dict[str, Any]]) -> dict[str, int]:
     cycles: dict[str, int] = {}
@@ -162,6 +199,160 @@ def _node_cycles(entries: list[dict[str, Any]]) -> dict[str, int]:
         cycles[node] = cycles.get(node, 0) + 1
     return cycles
 
+
+def _extract_plan_history(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    history: list[dict[str, Any]] = []
+
+    for entry in entries:
+        if entry.get("node") != "intent" or entry.get("direction") != "out":
+            continue
+
+        data = entry.get("data", {})
+        if not isinstance(data, dict):
+            continue
+
+        plan = data.get("plan", {})
+        if not isinstance(plan, dict) or not plan:
+            continue
+
+        raw_steps = plan.get("plan_steps", [])
+        steps = raw_steps if isinstance(raw_steps, list) else []
+
+        history.append(
+            {
+                "ts": entry.get("ts"),
+                "intent": data.get("intent"),
+                "intent_description": data.get("intent_description"),
+                "needs_fix": data.get("needs_fix"),
+                "problem": plan.get("problem"),
+                "fix_summary": plan.get("fix_summary"),
+                "steps": steps,
+                "step_count": len(steps),
+            }
+        )
+
+    return history
+
+
+def _normalize_prediction(
+    diagnosis: dict[str, Any], input_alert: dict[str, Any], needs_fix: Any = None
+) -> dict[str, Any]:
+    root_causes = diagnosis.get("root_causes", [])
+    if not isinstance(root_causes, list):
+        root_causes = []
+
+    primary_cause = root_causes[0] if root_causes else {}
+    primary_type = str(primary_cause.get("type", "")).strip()
+    issue_type = _normalize_issue_type(primary_type or str(primary_cause.get("cause", "unknown")))
+
+    return {
+        "detected": bool(root_causes),
+        "issue_type": issue_type,
+        "device": input_alert.get("device"),
+        "interface": input_alert.get("interface"),
+        "root_causes_ranked": [
+            {
+                "type": _normalize_issue_type(str(rc.get("type", ""))) if rc.get("type") else None,
+                "cause": _normalize_issue_type(str(rc.get("cause", "unknown"))),
+                "confidence": rc.get("confidence"),
+                "evidence": rc.get("evidence", []),
+            }
+            for rc in root_causes
+            if isinstance(rc, dict)
+        ],
+        "needs_fix": bool(needs_fix) if needs_fix is not None else None,
+    }
+
+
+def _extract_prediction_history(
+    entries: list[dict[str, Any]], input_alert: dict[str, Any]
+) -> list[dict[str, Any]]:
+    diagnose_events = [
+        e for e in entries if e.get("node") == "diagnose" and e.get("direction") == "out"
+    ]
+    intent_events = [
+        e
+        for e in entries
+        if e.get("node") == "intent"
+        and e.get("direction") == "out"
+        and isinstance(e.get("data"), dict)
+        and "needs_fix" in e.get("data", {})
+    ]
+
+    history: list[dict[str, Any]] = []
+    for idx, entry in enumerate(diagnose_events):
+        data = entry.get("data", {})
+        if not isinstance(data, dict):
+            continue
+
+        diagnosis = data.get("diagnosis", {})
+        if not isinstance(diagnosis, dict):
+            diagnosis = {}
+
+        needs_fix = None
+        if idx < len(intent_events):
+            intent_data = intent_events[idx].get("data", {})
+            if isinstance(intent_data, dict):
+                needs_fix = intent_data.get("needs_fix")
+
+        history.append(
+            {
+                "ts": entry.get("ts"),
+                **_normalize_prediction(diagnosis, input_alert, needs_fix),
+                "missing_info": diagnosis.get("missing_info", []),
+            }
+        )
+
+    return history
+
+
+def _extract_execution_history(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    history: list[dict[str, Any]] = []
+    seen_change_keys: set[str] = set()
+
+    for entry in entries:
+        if entry.get("node") != "collect_changes" or entry.get("direction") != "out":
+            continue
+
+        data = entry.get("data", {})
+        if not isinstance(data, dict):
+            continue
+
+        changes_raw = data.get("changes", [])
+        changes: list[dict[str, Any]] = []
+        if isinstance(changes_raw, list):
+            for change in changes_raw:
+                if not isinstance(change, dict):
+                    continue
+                changes.append(
+                    {
+                        "tool": change.get("tool"),
+                        "args": change.get("args", {}),
+                        "result": _extract_change_result(change.get("result")),
+                    }
+                )
+
+        new_changes: list[dict[str, Any]] = []
+        for change in changes:
+            change_key = json.dumps(change, sort_keys=True, ensure_ascii=False)
+            if change_key in seen_change_keys:
+                continue
+            seen_change_keys.add(change_key)
+            new_changes.append(change)
+
+        history.append(
+            {
+                "ts": entry.get("ts"),
+                "changes": new_changes,
+                "change_count": len(new_changes),
+                "total_change_count": len(changes),
+                "remediation_step_idx": data.get("remediation_step_idx"),
+                "remediation_done": data.get("remediation_done"),
+            }
+        )
+
+    return history
+
 # Build one structured run document from raw node enter/exit events.
 def build_extracted(entries: list[dict[str, Any]]) -> dict[str, Any]:
     if not entries:
@@ -172,7 +363,6 @@ def build_extracted(entries: list[dict[str, Any]]) -> dict[str, Any]:
 
     diagnose_out = _find(entries, "diagnose", "out", first=False) or {}
     intent_out_last = _find(entries, "intent", "out", first=False) or {}
-    collect_changes_out = _find(entries, "collect_changes", "out", first=False) or {}
     assess_verify_out = _find(entries, "assess_verify", "out", first=False) or {}
 
     monitor_in_data = monitor_in.get("data", {})
@@ -182,31 +372,14 @@ def build_extracted(entries: list[dict[str, Any]]) -> dict[str, Any]:
     diagnosis = diagnose_out.get("data", {}).get("diagnosis", {})
     if not isinstance(diagnosis, dict):
         diagnosis = {}
-    root_causes = diagnosis.get("root_causes", [])
-    if not isinstance(root_causes, list):
-        root_causes = []
-
-    primary_cause = root_causes[0] if root_causes else {}
-    primary_type = str(primary_cause.get("type", "")).strip()
-    issue_type = _normalize_issue_type(primary_type or str(primary_cause.get("cause", "unknown")))
 
     intent_out_data = intent_out_last.get("data", {})
     plan = intent_out_data.get("plan", {}) if isinstance(intent_out_data, dict) else {}
     plan_steps = plan.get("plan_steps", []) if isinstance(plan, dict) else []
-
-    changes_raw = collect_changes_out.get("data", {}).get("changes", [])
-    changes_out: list[dict[str, Any]] = []
-    if isinstance(changes_raw, list):
-        for change in changes_raw:
-            if not isinstance(change, dict):
-                continue
-            changes_out.append(
-                {
-                    "tool": change.get("tool"),
-                    "args": change.get("args", {}),
-                    "result": _extract_change_result(change.get("result")),
-                }
-            )
+    prediction = _normalize_prediction(diagnosis, input_alert, intent_out_data.get("needs_fix"))
+    prediction_history = _extract_prediction_history(entries, input_alert)
+    plan_history = _extract_plan_history(entries)
+    execution_history = _extract_execution_history(entries)
 
     verify = assess_verify_out.get("data", {}).get("verify", {})
     if not isinstance(verify, dict):
@@ -215,54 +388,21 @@ def build_extracted(entries: list[dict[str, Any]]) -> dict[str, Any]:
     all_start = min(_parse_ts(e["ts"]) for e in entries)
     all_end = max(_parse_ts(e["ts"]) for e in entries)
 
-    intent_in_events = [
-        e for e in entries if e.get("node") == "intent" and e.get("direction") == "in"
-    ]
-    intent_out_events = [
-        e for e in entries if e.get("node") == "intent" and e.get("direction") == "out"
-    ]
-    diagnose_in = _find(entries, "diagnose", "in", first=True)
-    diagnose_out_event = _find(entries, "diagnose", "out", first=False)
-    remediation_in = _find(entries, "remediation", "in", first=True)
-    remediation_out = _find(entries, "remediation", "out", first=False)
-    verify_in = _find(entries, "verify", "in", first=True)
-    assess_verify_out_event = _find(entries, "assess_verify", "out", first=False)
+    remediation_in_events = _entries_for(entries, "remediation", "in")
 
-    detect_s = 0.0
-    if intent_in_events and intent_out_events:
-        detect_s = round(
-            (
-                _parse_ts(intent_out_events[0]["ts"]) - _parse_ts(intent_in_events[0]["ts"])
-            ).total_seconds(),
-            1,
-        )
+    detect_s = _sum_paired_durations(entries, "intent")
+    diagnose_s = _sum_paired_durations(entries, "diagnose")
+    remediate_s = _sum_paired_durations(entries, "remediation")
+    # A verify cycle starts at `verify in` and completes at `assess_verify out`.
+    verify_s = _sum_paired_durations(entries, "verify", "assess_verify")
 
-    diagnose_s = 0.0
-    if diagnose_in and diagnose_out_event:
-        diagnose_s = round(
-            (_parse_ts(diagnose_out_event["ts"]) - _parse_ts(diagnose_in["ts"])).total_seconds(), 1
-        )
-
-    remediate_s = 0.0
-    if remediation_in and remediation_out:
-        remediate_s = round(
-            (_parse_ts(remediation_out["ts"]) - _parse_ts(remediation_in["ts"])).total_seconds(), 1
-        )
-
-    verify_s = 0.0
-    if verify_in and assess_verify_out_event:
-        verify_s = round(
-            (_parse_ts(assess_verify_out_event["ts"]) - _parse_ts(verify_in["ts"])).total_seconds(),
-            1,
-        )
-
-    get_info_out = _find(entries, "get_info", "out", first=False)
-    verify_out = _find(entries, "verify", "out", first=False)
-
-    tool_calls_pre_diagnosis = _tool_calls_count(get_info_out)
-    tool_calls_verify = _tool_calls_count(verify_out)
+    tool_calls_pre_diagnosis = _sum_tool_calls_for_nodes(
+        entries, {"intent", "get_info", "format_network", "diagnose"}
+    )
+    tool_calls_remediation = _sum_tool_calls_for_nodes(entries, {"remediation"})
+    tool_calls_verify = _sum_tool_calls_for_nodes(entries, {"verify", "assess_verify"})
     tool_calls_total = (
-        tool_calls_pre_diagnosis + _tool_calls_count(remediation_out) + tool_calls_verify
+        tool_calls_pre_diagnosis + tool_calls_remediation + tool_calls_verify
     )
 
     run_id = (
@@ -270,6 +410,7 @@ def build_extracted(entries: list[dict[str, Any]]) -> dict[str, Any]:
         or monitor_out.get("data", {}).get("thread_id")
         or "unknown"
     )
+    issue_type = prediction.get("issue_type", "unknown")
     test_case_id = f"tc_{_snake_case(str(input_alert.get('type', 'unknown')))}_{issue_type}_01"
 
     return {
@@ -280,37 +421,16 @@ def build_extracted(entries: list[dict[str, Any]]) -> dict[str, Any]:
             "ended_at": monitor_out.get("ts", all_end.isoformat()),
         },
         "input_alert": input_alert,
-        "prediction": {
-            "detected": bool(root_causes),
-            "issue_type": issue_type,
-            "device": input_alert.get("device"),
-            "interface": input_alert.get("interface"),
-            "root_causes_ranked": [
-                {
-                    "type": _normalize_issue_type(str(rc.get("type", "")))
-                    if rc.get("type")
-                    else None,
-                    "cause": _normalize_issue_type(str(rc.get("cause", "unknown"))),
-                    "confidence": rc.get("confidence"),
-                    "evidence": rc.get("evidence", []),
-                }
-                for rc in root_causes
-                if isinstance(rc, dict)
-            ],
-            "needs_fix": bool(intent_out_data.get("needs_fix")),
-        },
-        "plan": {
-            "intent": intent_out_data.get("intent"),
-            "steps": plan_steps if isinstance(plan_steps, list) else [],
-        },
+        "prediction_history": prediction_history,
+        "plan_history": plan_history,
         "execution": {
-            "changes": changes_out,
             "verify": {
                 "passed": bool(verify.get("passed")),
                 "evidence": _extract_verify_evidence_obj(verify),
                 "remaining_issues": verify.get("remaining_issues", []),
             },
         },
+        "execution_history": execution_history,
         "metrics_input": {
             "timings": {
                 "detect_s": detect_s,
@@ -323,9 +443,13 @@ def build_extracted(entries: list[dict[str, Any]]) -> dict[str, Any]:
             "counts": {
                 "tool_calls_total": tool_calls_total,
                 "tool_calls_pre_diagnosis": tool_calls_pre_diagnosis,
+                "tool_calls_remediation": tool_calls_remediation,
                 "tool_calls_verify": tool_calls_verify,
-                "remediation_attempts": 1 if remediation_in else 0,
+                "remediation_attempts": len(remediation_in_events),
                 "plan_steps": len(plan_steps) if isinstance(plan_steps, list) else 0,
+                "diagnoses_created": len(prediction_history),
+                "plans_created": len(plan_history),
+                "execution_updates": len(execution_history),
             },
             "tokens": _sum_tokens(entries),
         },
@@ -346,6 +470,56 @@ def write_extracted_logs(
     return output_path
 
 
+def _discover_log_inputs(path: Path) -> list[Path]:
+    if path.is_file():
+        return [path] if path.name == NODE_IO_LOG_PATH.name else []
+    if not path.exists():
+        return []
+    return sorted(path.rglob(NODE_IO_LOG_PATH.name))
+
+
+def _default_output_path(input_path: Path) -> Path:
+    return input_path.with_name(EXTRACTED_LOGS_PATH.name)
+
+
+def _run_cli(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(
+        description="Extract structured summaries from node_io_log.jsonl files."
+    )
+    parser.add_argument(
+        "path",
+        nargs="?",
+        default=str(NODE_IO_LOG_PATH),
+        help="A node_io_log.jsonl file or a directory to scan recursively.",
+    )
+    parser.add_argument(
+        "--output",
+        help="Output JSON path for single-file mode. Not used when scanning directories.",
+    )
+    args = parser.parse_args(argv)
+
+    input_path = Path(args.path)
+
+    if input_path.is_file():
+        output_path = Path(args.output) if args.output else _default_output_path(input_path)
+        out = write_extracted_logs(input_path=input_path, output_path=output_path)
+        print(f"Wrote: {out}")
+        return 0
+
+    log_paths = _discover_log_inputs(input_path)
+    if not log_paths:
+        print(f"No {NODE_IO_LOG_PATH.name} files found under: {input_path}", file=sys.stderr)
+        return 1
+
+    for log_path in log_paths:
+        out = write_extracted_logs(
+            input_path=log_path,
+            output_path=_default_output_path(log_path),
+        )
+        print(f"Wrote: {out}")
+
+    return 0
+
+
 if __name__ == "__main__":
-    out = write_extracted_logs()
-    print(f"Wrote: {out}")
+    raise SystemExit(_run_cli(sys.argv[1:]))

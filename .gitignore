@@ -48,11 +48,8 @@ htmlcov/
 # =========================
 *.log
 logger/
-
-# =========================
-# Memory
-# =========================
-memory/
+test_logs(01)
+test_logs(02)
 
 # =========================
 # IDEs / editors
@@ -71,3 +68,4 @@ Thumbs.db
 # Workspace files
 # =========================
 *.code-workspace
+.codex

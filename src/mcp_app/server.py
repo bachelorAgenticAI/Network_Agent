@@ -3,7 +3,6 @@ import logging
 from mcp.server.fastmcp import FastMCP
 
 # Tools for diagnostic capabilities
-from mcp_app.tools.arp import arp_tools
 from mcp_app.tools.device_info import config_tools
 from mcp_app.tools.dhcp import dhcp_tools
 from mcp_app.tools.interface import interface_tools
@@ -16,9 +15,6 @@ from mcp_app.tools.rem_dhcp import rem_dhcp_tools
 from mcp_app.tools.rem_interface import rem_interface_tools
 from mcp_app.tools.rem_ospf import rem_ospf_tools
 from mcp_app.tools.rem_routing import rem_routing_tools
-
-# Tool used to retrieve available router names from the inventory
-from mcp_app.tools.router_names import list_router_names
 
 # ----------------- LOGGING -----------------
 logging.basicConfig(
@@ -33,10 +29,8 @@ mcp = FastMCP("AI_MCP_Router")
 
 # ----------------- DIAGNOSTIC TOOLS -----------------
 # These tools provide read-only diagnostic capabilities
-list_router_names(mcp)
 config_tools(mcp)
 interface_tools(mcp)
-arp_tools(mcp)
 ospf_tools(mcp)
 dhcp_tools(mcp)
 
