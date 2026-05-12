@@ -161,9 +161,9 @@ def format_network_node(state: AgentState, llm_format) -> dict:
             "previous_network_db": state.get("network_db") or {},
             "recent_tool_data": [],
         }
-        log_node_enter("format_network", payload)
+        log_node_enter("format_network", payload) # Logger
         out = _fast_path_no_new_tool_data(state, target)
-        log_node_exit("format_network", out)
+        log_node_exit("format_network", out) # Logger
         return out
 
     payload = {

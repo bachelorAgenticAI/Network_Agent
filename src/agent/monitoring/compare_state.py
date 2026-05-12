@@ -9,7 +9,7 @@ MEMORY_DIR = Path(__file__).resolve().parent.parent / "memory"
 STATE_FILE = MEMORY_DIR / "last_state.json"
 ALERT_FILE = MEMORY_DIR / "alerts.json"
 INCIDENT_FILE = MEMORY_DIR / "incidents.json"
-CUSTOM_ALERT_FILE = MEMORY_DIR / "custom_alerts.json"  # Manual test
+CUSTOM_ALERT_FILE = MEMORY_DIR / "custom_alerts.json"  # Used for manual testing with custom injected alerts.
 
 ERROR_THRESHOLD = (
     10  # Alert if input_errors or output_errors increase by this amount since last check.
@@ -156,7 +156,7 @@ def print_alerts(alerts):
     print()
 
 
-# Can run as a standalone aswell for testing purposes
+# Standalone test entry point.
 if __name__ == "__main__":
     alerts = asyncio.run(compare())
     if alerts:

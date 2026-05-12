@@ -1,4 +1,4 @@
-"""Build and run the LangGraph workflow for monitoring, diagnosis, remediation, and summary."""
+"""Build and run the LangGraph workflow for monitoring, diagnosis, remediation, verification, and summary."""
 
 import asyncio
 
@@ -32,7 +32,7 @@ def _route_from_controller(state: AgentState) -> str:
     v = state.get("verify") or {}
     # Only retry after verification failure if we're past initial phase
     if state.get("phase") != "start" and v.get("passed") is False:
-        if int(state.get("attempts", 0)) >= 1:  # set value for retry limit
+        if int(state.get("attempts", 0)) >= 1:  # set value for retry limit. 1=2 rounds
             return "summary"
         return "get_info"
 
@@ -190,13 +190,14 @@ async def main():
         )
 
         tools_all = await client.get_tools()
+        # For debugging: print all available tools at startup to verify connectivity and tool loading.
         print("TOOLS:", len(tools_all))
         print([getattr(t, "name", None) for t in tools_all])
     except Exception:
         print("Could not connect to MCP")
         return
 
-    # Binds one shared tool set to all phases. For simplicity, using same LLM for all nodes'.
+    # Binds one shared tool set to all phases. For simplicity, using same for all nodes.
     tools_intent = tools_all
     tools_info = tools_all
     tools_remediate = tools_all
@@ -204,7 +205,7 @@ async def main():
 
     base = ChatOpenAI(
         model="gpt-5-mini", temperature=0
-    )  # Choice of model and temperature should be tuned based on needs of each node.
+    )  # Choice of model and temperature should be tuned based on needs.
     llm_intent = base.bind_tools(tools_intent)
     llm_info = base.bind_tools(tools_info)
     llm_remediate = base.bind_tools(tools_remediate)
@@ -235,12 +236,14 @@ async def main():
             if alerts:
                 thread_id += 1
                 config["configurable"]["thread_id"] = f"alert-{thread_id}"
+                #Logger
                 log_node_enter(
                     "monitor_loop",
                     {"thread_id": config["configurable"]["thread_id"], "alerts": alerts},
                 )
                 # Main agent invocation with the detected alert as input.
                 state = await app.ainvoke({"user_input": str(alerts)}, config=config)
+                #Logger
                 log_node_exit(
                     "monitor_loop",
                     {

@@ -12,7 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MEMORY_DIR = PROJECT_ROOT / "memory"
 DB_PATH = MEMORY_DIR / "network_db.json"
 
-# Create storage folder/file lazily on first access.
+# Create storage folder/file if it doesn't exist.
 def _ensure() -> None:
     MEMORY_DIR.mkdir(parents=True, exist_ok=True)
     if not DB_PATH.exists():

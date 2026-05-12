@@ -7,19 +7,18 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
-# Agent schemas used by control/decision nodes.
+# Schema used for diagnosis output.
 class RootCause(BaseModel):
     type: str
     cause: str
     evidence: list[str] = Field(default_factory=list)
     confidence: float = Field(0.0, ge=0.0, le=1.0)
 
-# Schema used for diagnosis output.
 class Diagnosis(BaseModel):
     root_causes: list[RootCause] = Field(default_factory=list)
     missing_info: list[str] = Field(default_factory=list)
 
-
+# Schema for plansteps output.
 class PlanStep(BaseModel):
     id: int
     device: str  # "router<number>"

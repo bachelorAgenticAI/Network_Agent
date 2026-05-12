@@ -10,7 +10,7 @@ from typing import Any
 
 _WRITE_LOCK = Lock()
 _LOG_DIR = Path(__file__).resolve().parent.parent / "logger"
-_NODE_IO_LOG_PATH = _LOG_DIR / "node_io_log.jsonl"
+_NODE_IO_LOG_PATH = _LOG_DIR / "node_io_log.jsonl" # Changed to raw_log.jsonl in /logs/test_logs/case(x)/
 
 
 # Log timestamp format for node events.

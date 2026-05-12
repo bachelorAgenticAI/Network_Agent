@@ -119,11 +119,11 @@ def intent_node(state: AgentState, llm) -> dict:
     }
 
     if diagnosis is not None:
-        # If diagnosis has no actionable findings, skip remediation.
+        # If diagnosis has no findings, skip remediation.
         has_findings = bool(
             (diagnosis.get("root_causes") or [])
             or (diagnosis.get("risks") or [])
-            or (diagnosis.get("missing_info") or [])
+            or (diagnosis.get("missing_info") or []) # missing_info is treated as a finding. Excluding it would check for actionable root causes and risks.
         )
 
         if not has_findings:

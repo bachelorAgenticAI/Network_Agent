@@ -12,12 +12,12 @@ async def get_running_config(router_name: str) -> dict:
 
     async with get_client(router) as client:
         try:
-            # Hent hele native-blokken
+            # Collect the entire native block 
             r = await client.get(f"{base}/data/Cisco-IOS-XE-native:native")
             r.raise_for_status()
             data = r.json().get("Cisco-IOS-XE-native:native", {})
 
-            # Filtrer på klient-siden
+            # Filter on the client side
             return {
                 "hostname": data.get("hostname"),
                 "ios_xe_version": data.get("version"),

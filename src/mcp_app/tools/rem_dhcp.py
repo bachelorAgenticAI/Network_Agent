@@ -59,9 +59,9 @@ async def delete_dhcp_pool(router_name: str, pool_id: str) -> dict:
 # Add or update a DHCP excluded-address range to prevent leasing reserved IPs
 async def add_dhcp_excluded_address(router_name: str, low_address: str, high_address: str) -> dict:
     """
-    Legger til/oppdaterer excluded-address range via PATCH på DHCP-containeren.
+    Adds or updates the excluded-address range via PATCH on the DHCP container.
 
-    NB: IOS-XE krever wrapper "Cisco-IOS-XE-native:dhcp" på denne mounten.
+    Note: IOS-XE requires the `Cisco-IOS-XE-native:dhcp` wrapper on this mount.
     """
     router = get_router(router_name)
     path = f"https://{router.host}/restconf/data/Cisco-IOS-XE-native:native/ip/dhcp"
@@ -89,17 +89,17 @@ async def add_dhcp_excluded_address(router_name: str, low_address: str, high_add
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-            # Delete a specific DHCP excluded-address range
+            
 
-
+# Delete a specific DHCP excluded-address range
 async def delete_dhcp_excluded_address(
     router_name: str, low_address: str, high_address: str
 ) -> dict:
     """
-    Sletter en eksisterende excluded-address range.
+    Deletes an existing excluded-address range.
 
-    Eksempel CLI:
-      no ip dhcp excluded-address 192.168.10.1 192.168.10.20
+    CLI example:
+    no ip dhcp excluded-address 192.168.10.1 192.168.10.20
     """
     router = get_router(router_name)
     path = (

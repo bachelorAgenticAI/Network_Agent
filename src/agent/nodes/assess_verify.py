@@ -24,7 +24,7 @@ Return structured output.
 """
 
 
-# Extract tool-related messages from the most recent verification round. If none, fallback to latest global tool messages.
+# Extract tool-related messages from the most recent verification round.
 def _extract_recent_verify_tool_msgs(state: AgentState, limit: int = 30) -> list[dict]:
     # Prefer messages from the current verify round; fallback to latest global tool activity.
     msgs = state.get("messages") or []

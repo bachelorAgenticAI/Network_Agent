@@ -7,6 +7,7 @@ class Router:
 
 
 # Predefined set of available routers
+# Adjust this dictionary to match the actual routers in your environment, with correct host IPs and credentials.
 ROUTERS = {
     "router1": Router(name="R1", host="192.168.0.1", user="restconf", password="pswd"),
     "router2": Router(name="R2", host="10.0.0.2", user="restconf", password="pswd"),

@@ -12,7 +12,7 @@ from typing import Any
 
 LOG_DIR = Path(__file__).resolve().parent.parent / "logger"
 NODE_IO_LOG_PATH = LOG_DIR / "node_io_log.jsonl"
-EXTRACTED_LOGS_PATH = LOG_DIR / "extracted_logs.json"
+EXTRACTED_LOGS_PATH = LOG_DIR / "extracted_logs.json" # Changed to /logs/test_logs/case(x)/processed_logs.json for test-specific outputs.
 
 # Log timestamps may use Z; normalize to ISO format understood by datetime.
 def _parse_ts(ts: str) -> datetime:
@@ -152,7 +152,7 @@ def _tool_calls_count(entry: dict[str, Any] | None) -> int:
             total += len(tool_calls)
     return total
 
-
+# Return entries matching a node and direction.
 def _entries_for(
     entries: list[dict[str, Any]], node: str, direction: str
 ) -> list[dict[str, Any]]:
@@ -160,7 +160,7 @@ def _entries_for(
         e for e in entries if e.get("node") == node and e.get("direction") == direction
     ]
 
-
+# Sum durations by pairing each start-node input with the corresponding end-node output.
 def _sum_paired_durations(
     entries: list[dict[str, Any]], start_node: str, end_node: str | None = None
 ) -> float:
@@ -169,14 +169,14 @@ def _sum_paired_durations(
     ends = _entries_for(entries, end_node, "out")
 
     total_seconds = 0.0
-    for start, end in zip(starts, ends):
+    for start, end in zip(starts, ends, strict=False):
         delta = (_parse_ts(end["ts"]) - _parse_ts(start["ts"])).total_seconds()
         if delta > 0:
             total_seconds += delta
 
     return round(total_seconds, 1)
 
-
+# Count tool calls from output events for the selected nodes.
 def _sum_tool_calls_for_nodes(entries: list[dict[str, Any]], nodes: set[str]) -> int:
     total = 0
     for entry in entries:
@@ -199,7 +199,7 @@ def _node_cycles(entries: list[dict[str, Any]]) -> dict[str, int]:
         cycles[node] = cycles.get(node, 0) + 1
     return cycles
 
-
+# Collect history of plan
 def _extract_plan_history(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
     history: list[dict[str, Any]] = []
 
@@ -233,7 +233,7 @@ def _extract_plan_history(entries: list[dict[str, Any]]) -> list[dict[str, Any]]
 
     return history
 
-
+# Convert diagnosis output into a normalized prediction record.
 def _normalize_prediction(
     diagnosis: dict[str, Any], input_alert: dict[str, Any], needs_fix: Any = None
 ) -> dict[str, Any]:
@@ -263,7 +263,7 @@ def _normalize_prediction(
         "needs_fix": bool(needs_fix) if needs_fix is not None else None,
     }
 
-
+# Build a chronological history of diagnosis predictions.
 def _extract_prediction_history(
     entries: list[dict[str, Any]], input_alert: dict[str, Any]
 ) -> list[dict[str, Any]]:
@@ -305,7 +305,7 @@ def _extract_prediction_history(
 
     return history
 
-
+# Extract remediation changes from collect_changes events.
 def _extract_execution_history(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
     history: list[dict[str, Any]] = []
     seen_change_keys: set[str] = set()
@@ -469,7 +469,7 @@ def write_extracted_logs(
 
     return output_path
 
-
+# Resolve one log file or recursively find node_io_log.jsonl files under a directory.
 def _discover_log_inputs(path: Path) -> list[Path]:
     if path.is_file():
         return [path] if path.name == NODE_IO_LOG_PATH.name else []
@@ -477,11 +477,11 @@ def _discover_log_inputs(path: Path) -> list[Path]:
         return []
     return sorted(path.rglob(NODE_IO_LOG_PATH.name))
 
-
+# Use extracted_logs.json beside the input log file as the default output path.
 def _default_output_path(input_path: Path) -> Path:
     return input_path.with_name(EXTRACTED_LOGS_PATH.name)
 
-
+# Run the command-line extractor for a file or directory of logs.
 def _run_cli(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(
         description="Extract structured summaries from node_io_log.jsonl files."
