@@ -19,7 +19,7 @@ The system consists of a LangGraph-based agent workflow and an MCP (Model Contex
 
 ## Requirements
 
-- Python `>=3.11,<3.14`
+- Python `3.13.5`
 - Linux
 - Network access to configured management endpoints
 - `.env` configuration file with API keys (e.g., OpenAI)
