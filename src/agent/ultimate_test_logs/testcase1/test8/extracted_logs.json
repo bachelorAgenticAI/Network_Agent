@@ -1,0 +1,129 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_oper_state_change_configuration_01",
+    "started_at": "2026-05-26T08:36:46.732198+00:00",
+    "ended_at": "2026-05-26T08:38:46.300801+00:00"
+  },
+  "input_alert": {
+    "type": "oper_state_change",
+    "device": "R1",
+    "interface": "Serial0/1/0",
+    "old_oper_state": "up",
+    "new_oper_state": "lower-layer-down",
+    "old_admin_state": "up",
+    "new_admin_state": "up"
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-26T08:38:06.572434+00:00",
+      "detected": true,
+      "issue_type": "configuration",
+      "device": "R1",
+      "interface": "Serial0/1/0",
+      "root_causes_ranked": [
+        {
+          "type": "configuration",
+          "cause": "admin_shutdown",
+          "confidence": 0.95,
+          "evidence": [
+            "R2 running-config: Serial0/1/0 contains \"shutdown\" (get_running_config for R2).",
+            "R2 interface status: admin_state=\"down\", oper_state=\"down\", last_change=\"2026-05-26T09:37:34...\" (get_interface_status for R2 Serial0/1/0).",
+            "R1 interface status: admin_state=\"up\", oper_state=\"lower-layer-down\", last_change=\"2026-05-26T09:37:37...\" (get_interface_status for R1 Serial0/1/0).",
+            "R1/R2 OSPF summaries: Serial0/1/0 listed as interface_state=\"Down\" with no neighbors on both routers, while other serial links to R3 show FULL neighbors (get_ospf outputs).",
+            "Topology/config evidence: interface IPs and descriptions show R1 Serial0/1/0 <-> R2 Serial0/1/0 (10.0.0.1/30 <-> 10.0.0.2/30), confirming the affected link (running-config)."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-26T08:38:15.561735+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "R2 Serial0/1/0 is administratively down, causing the R1<->R2 serial link to be down and OSPF adjacency loss. Restore the physical/link connectivity by enabling R2 Serial0/1/0 so the interface reaches oper up and OSPF neighbors return.",
+      "needs_fix": true,
+      "problem": "R2 Serial0/1/0 is administratively shutdown, causing the link to R1 to be down and OSPF neighbor loss.",
+      "fix_summary": "Bring R2 Serial0/1/0 admin state to up (no shutdown) to restore the link and OSPF adjacency.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "set_interface_admin_state",
+          "target": "Serial0/1/0",
+          "parameters": [
+            "admin_state=up"
+          ]
+        }
+      ],
+      "step_count": 1
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-26T08:38:23.724312+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "Serial0/1/0",
+            "state": "up"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 15.5,
+      "diagnose_s": 11.9,
+      "remediate_s": 7.4,
+      "verify_s": 16.0,
+      "total_s": 119.6
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 1,
+      "collect_changes": 1,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 15,
+      "tool_calls_pre_diagnosis": 9,
+      "tool_calls_remediation": 1,
+      "tool_calls_verify": 5,
+      "remediation_attempts": 1,
+      "plan_steps": 1,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 1
+    },
+    "tokens": {
+      "total_prompt_tokens": 41541,
+      "total_completion_tokens": 12576,
+      "total_tokens": 54117
+    }
+  }
+}

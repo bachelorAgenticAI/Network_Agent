@@ -1,0 +1,139 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_oper_state_change_admin_shutdown_01",
+    "started_at": "2026-05-26T08:22:49.454062+00:00",
+    "ended_at": "2026-05-26T08:24:56.449505+00:00"
+  },
+  "input_alert": {
+    "type": "oper_state_change",
+    "device": "R1",
+    "interface": "Serial0/1/0",
+    "old_oper_state": "up",
+    "new_oper_state": "lower-layer-down",
+    "old_admin_state": "up",
+    "new_admin_state": "up"
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-26T08:24:11.259798+00:00",
+      "detected": true,
+      "issue_type": "admin_shutdown",
+      "device": "R1",
+      "interface": "Serial0/1/0",
+      "root_causes_ranked": [
+        {
+          "type": "admin_shutdown",
+          "cause": "admin_shutdown",
+          "confidence": 0.95,
+          "evidence": [
+            "R2 running-config: interfaces -> Serial -> name: \"0/1/0\" contains \"shutdown\": [ null ]",
+            "R2 running-config: interfaces -> Serial -> name: \"0/1/0\" ip address primary: \"10.0.0.2\" (shows interface exists but is shut)"
+          ]
+        },
+        {
+          "type": "remote_side_admin_down_causing_local_lower_layer_down",
+          "cause": "admin_shutdown",
+          "confidence": 0.9,
+          "evidence": [
+            "R1 running-config: interfaces -> Serial -> name: \"0/1/0\" has IP address primary \"10.0.0.1\" and no \"shutdown\" stanza (interface is admin up)",
+            "Topology/run-config evidence: R1 Serial0/1/0 10.0.0.1/30 <-> R2 Serial0/1/0 10.0.0.2/30 (interfaces expected to be a point-to-point link)",
+            "Alert description: R1 oper -> lower-layer-down, admin up; R2 oper -> down, admin -> down (matches configurations above)"
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-26T08:24:22.243886+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "R2 Serial0/1/0 is administratively down causing R1 Serial0/1/0 to report lower-layer-down; goal is to restore the point-to-point link so both interfaces are administratively and operationally up.",
+      "needs_fix": true,
+      "problem": "R2 Serial0/1/0 is administratively shutdown, preventing link with R1 and causing R1 oper state lower-layer-down.",
+      "fix_summary": "Bring R2 Serial0/1/0 administratively up (remove shutdown) so the serial link with R1 can achieve up/up.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "set_interface_admin_up",
+          "target": "Serial0/1/0",
+          "parameters": [
+            "no shutdown"
+          ]
+        }
+      ],
+      "step_count": 1
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {
+        "interface_admin_state": "up",
+        "interface_oper_state": "up"
+      },
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-26T08:24:31.014880+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "Serial0/1/0",
+            "state": "up"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 18.3,
+      "diagnose_s": 10.7,
+      "remediate_s": 8.0,
+      "verify_s": 16.9,
+      "total_s": 127.0
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 1,
+      "collect_changes": 1,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 5,
+      "tool_calls_pre_diagnosis": 3,
+      "tool_calls_remediation": 1,
+      "tool_calls_verify": 1,
+      "remediation_attempts": 1,
+      "plan_steps": 1,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 1
+    },
+    "tokens": {
+      "total_prompt_tokens": 33886,
+      "total_completion_tokens": 11146,
+      "total_tokens": 45032
+    }
+  }
+}

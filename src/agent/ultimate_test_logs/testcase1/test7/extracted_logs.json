@@ -1,0 +1,176 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_oper_state_change_admin_shutdown_01",
+    "started_at": "2026-05-26T08:32:56.136645+00:00",
+    "ended_at": "2026-05-26T08:35:09.528830+00:00"
+  },
+  "input_alert": {
+    "type": "oper_state_change",
+    "device": "R1",
+    "interface": "Serial0/1/0",
+    "old_oper_state": "up",
+    "new_oper_state": "lower-layer-down",
+    "old_admin_state": "up",
+    "new_admin_state": "up"
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-26T08:34:11.922065+00:00",
+      "detected": true,
+      "issue_type": "admin_shutdown",
+      "device": "R1",
+      "interface": "Serial0/1/0",
+      "root_causes_ranked": [
+        {
+          "type": "admin_shutdown",
+          "cause": "remote_serial_interface_is_administratively_down_likely_bringing_the_link_down_at_the_opposite_end",
+          "confidence": 0.8,
+          "evidence": [
+            "router2 Serial0/1/0: admin_state=down oper_state=down (last_change=2026-05-26T09:33:29.000423+00:00)",
+            "router1 Serial0/1/0: admin_state=up oper_state=lower-layer-down (last_change=2026-05-26T09:33:32.000968+00:00)"
+          ]
+        },
+        {
+          "type": "admin_shutdown",
+          "cause": "admin_shutdown",
+          "confidence": 0.95,
+          "evidence": [
+            "router2 Serial0/1/0: admin_state=down oper_state=down (speed=2048000, input_errors=0, output_errors=0, last_change=2026-05-26T09:33:29.000423+00:00)"
+          ]
+        },
+        {
+          "type": "physical_lower_layer_failure_local",
+          "cause": "router1_serial0_1_0_shows_lower_layer_down_while_admin_is_up_indicating_a_local_physical_clocking_csu_dsu_problem_or_loss_of_carrier_if_the_remote_end_is_not_administratively_down",
+          "confidence": 0.45,
+          "evidence": [
+            "router1 Serial0/1/0: admin_state=up oper_state=lower-layer-down (speed=2064384, input_errors=0, output_errors=0, last_change=2026-05-26T09:33:32.000968+00:00)",
+            "speed reported differs from router2's speed (router1 2064384 vs router2 2048000) — possible clocking/line-rate mismatch"
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": [
+        "Which device/interface is the configured peer for router1 Serial0/1/0 (to confirm R1 <-> R2 adjacency)?",
+        "Was the administrative shutdown on router2 intentional (change control/operator action) or unexpected?",
+        "Show CSU/DSU or controller and clocking status and any recent interface logs for router1 and router2 around the last_change timestamps (to differentiate remote admin-down vs local physical/clocking failure)."
+      ]
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-26T08:34:29.521955+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "Restore operational serial link between router1 Serial0/1/0 and router2 Serial0/1/0 after router2 admin-down and router1 lower-layer-down; expected outcome is oper_state=up on affected interfaces.",
+      "needs_fix": true,
+      "problem": "Serial link down: router2 Serial0/1/0 is administratively down (oper down); router1 Serial0/1/0 is admin up but oper lower-layer-down (possible clocking/line-rate mismatch).",
+      "fix_summary": "Re-enable router2 interface administratively. If the link remains down, align clocking/line-rate on router1 Serial0/1/0 to match router2 (2048000 bps).",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "set_interface_admin_state",
+          "target": "Serial0/1/0",
+          "parameters": [
+            "up"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router1",
+          "action": "set_interface_clock_rate",
+          "target": "Serial0/1/0",
+          "parameters": [
+            "2048000"
+          ]
+        }
+      ],
+      "step_count": 2
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": [
+        "Reported interface speeds still differ (router1=2064384 vs router2=2048000) — verify clocking/clock-rate configuration and persistence, and confirm no intermittent flapping."
+      ]
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-26T08:34:35.661913+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "Serial0/1/0",
+            "state": "up"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-26T08:34:45.395253+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router1",
+            "interface_name": "Serial0/1/0",
+            "state": "up"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 2,
+      "remediation_step_idx": 2,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 26.1,
+      "diagnose_s": 24.0,
+      "remediate_s": 14.7,
+      "verify_s": 16.8,
+      "total_s": 133.4
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 2,
+      "collect_changes": 2,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 7,
+      "tool_calls_pre_diagnosis": 3,
+      "tool_calls_remediation": 2,
+      "tool_calls_verify": 2,
+      "remediation_attempts": 2,
+      "plan_steps": 2,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 2
+    },
+    "tokens": {
+      "total_prompt_tokens": 33511,
+      "total_completion_tokens": 14137,
+      "total_tokens": 47648
+    }
+  }
+}

@@ -1,0 +1,132 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_oper_state_change_admin_shutdown_01",
+    "started_at": "2026-05-26T07:57:07.081266+00:00",
+    "ended_at": "2026-05-26T07:59:57.863247+00:00"
+  },
+  "input_alert": {
+    "type": "oper_state_change",
+    "device": "R1",
+    "interface": "Serial0/1/0",
+    "old_oper_state": "up",
+    "new_oper_state": "lower-layer-down",
+    "old_admin_state": "up",
+    "new_admin_state": "up"
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-26T07:59:05.918833+00:00",
+      "detected": true,
+      "issue_type": "admin_shutdown",
+      "device": "R1",
+      "interface": "Serial0/1/0",
+      "root_causes_ranked": [
+        {
+          "type": "admin_shutdown",
+          "cause": "r2_serial0_1_0_is_administratively_shut_causing_the_serial_link_to_drop_and_r1_serial0_1_0_admin_up_to_report_oper_state_lower_layer_down",
+          "confidence": 0.95,
+          "evidence": [
+            "R2 get_interface_status (Serial0/1/0): \"admin_state\": \"down\", \"oper_state\": \"down\", \"last_change\": \"2026-05-26T08:57:57.000708+00:00\"",
+            "R2 running-config: Serial0/1/0 contains \"shutdown\" (interface 0/1/0 has \"shutdown\": [ null ])",
+            "R1 get_interface_status (Serial0/1/0): \"admin_state\": \"up\", \"oper_state\": \"lower-layer-down\", \"last_change\": \"2026-05-26T08:58:01.000509+00:00\"",
+            "Timestamp ordering: R2 admin/down change at 08:57:57 precedes R1 oper transition at 08:58:01 — consistent with remote admin shutdown causing R1 link loss"
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-26T07:59:22.255425+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "R2 Serial0/1/0 is administratively shut causing the serial link to drop and R1 Serial0/1/0 to report oper-state lower-layer-down; restore link by re-enabling R2 interface.",
+      "needs_fix": true,
+      "problem": "R2 Serial0/1/0 is administratively down, causing the serial link to fail and R1 Serial0/1/0 to go lower-layer-down.",
+      "fix_summary": "Set administrative state of R2 Serial0/1/0 to up (no shutdown). Risk: brief traffic interruption on the link during state transition.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "set_interface_admin_state",
+          "target": "Serial0/1/0",
+          "parameters": [
+            "Serial0/1/0",
+            "up"
+          ]
+        }
+      ],
+      "step_count": 1
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {
+        "interface_admin_state": "up",
+        "interface_oper_state": "up"
+      },
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-26T07:59:30.158942+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "Serial0/1/0",
+            "state": "up"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 27.7,
+      "diagnose_s": 17.5,
+      "remediate_s": 7.0,
+      "verify_s": 22.4,
+      "total_s": 170.8
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 1,
+      "collect_changes": 1,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 10,
+      "tool_calls_pre_diagnosis": 6,
+      "tool_calls_remediation": 1,
+      "tool_calls_verify": 3,
+      "remediation_attempts": 1,
+      "plan_steps": 1,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 1
+    },
+    "tokens": {
+      "total_prompt_tokens": 38376,
+      "total_completion_tokens": 13106,
+      "total_tokens": 51482
+    }
+  }
+}

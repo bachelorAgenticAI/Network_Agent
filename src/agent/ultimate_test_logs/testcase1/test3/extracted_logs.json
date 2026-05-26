@@ -1,0 +1,130 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_oper_state_change_admin_shutdown_01",
+    "started_at": "2026-05-26T08:15:57.751480+00:00",
+    "ended_at": "2026-05-26T08:20:19.722643+00:00"
+  },
+  "input_alert": {
+    "type": "oper_state_change",
+    "device": "R1",
+    "interface": "Serial0/1/0",
+    "old_oper_state": "up",
+    "new_oper_state": "lower-layer-down",
+    "old_admin_state": "up",
+    "new_admin_state": "up"
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-26T08:17:55.956385+00:00",
+      "detected": true,
+      "issue_type": "admin_shutdown",
+      "device": "R1",
+      "interface": "Serial0/1/0",
+      "root_causes_ranked": [
+        {
+          "type": "admin_shutdown",
+          "cause": "admin_shutdown",
+          "confidence": 0.95,
+          "evidence": [
+            "R2 running-config (get_running_config): Serial0/1/0 contains \"shutdown\"",
+            "R2 interface status (get_interface_status): admin_state=\"down\", oper_state=\"down\", last_change=\"2026-05-26T09:16:44.00068+00:00\"",
+            "R1 interface status (get_interface_status): admin_state=\"up\", oper_state=\"lower-layer-down\", last_change=\"2026-05-26T09:16:48.000135+00:00\"",
+            "OSPF on both routers (get_ospf): Serial0/1/0 interface_state = \"Down\" on R1 and R2 (no neighbors listed)"
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-26T08:18:08.898349+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "R2 Serial0/1/0 was administratively shut (admin down) which removed carrier and caused R1 Serial0/1/0 to go lower-layer-down; goal is to bring R2 Serial0/1/0 admin up so the link and OSPF adjacency are restored.",
+      "needs_fix": true,
+      "problem": "R2 Serial0/1/0 is administratively shut (shutdown in running-config) causing the link to R1 to lose carrier and OSPF adjacency.",
+      "fix_summary": "Undo the administrative shutdown on R2 Serial0/1/0 (set admin up) to restore link carrier and OSPF neighbors.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "set_interface_admin_state",
+          "target": "Serial0/1/0",
+          "parameters": [
+            "admin_state=up"
+          ]
+        }
+      ],
+      "step_count": 1
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": [
+        "OSPF RESTCONF fetch for router3 failed with 401 Unauthorized (get_ospf call returned 401) — unrelated to the R2 shutdown fix but worth addressing for monitoring/visibility"
+      ]
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-26T08:19:41.156833+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "Serial0/1/0",
+            "state": "up"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 21.1,
+      "diagnose_s": 14.7,
+      "remediate_s": 91.4,
+      "verify_s": 32.2,
+      "total_s": 262.0
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 1,
+      "collect_changes": 1,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 15,
+      "tool_calls_pre_diagnosis": 9,
+      "tool_calls_remediation": 1,
+      "tool_calls_verify": 5,
+      "remediation_attempts": 1,
+      "plan_steps": 1,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 1
+    },
+    "tokens": {
+      "total_prompt_tokens": 46195,
+      "total_completion_tokens": 12471,
+      "total_tokens": 58666
+    }
+  }
+}
