@@ -1,0 +1,140 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_configuration_ospf_network_statement_missing_01",
+    "started_at": "2026-05-26T10:45:13.253739+00:00",
+    "ended_at": "2026-05-26T10:48:45.414013+00:00"
+  },
+  "input_alert": {
+    "alert_type": "network_reachability",
+    "source_network": "192.168.0.11",
+    "destination_ip": "172.16.0.11",
+    "pings_sent": 25,
+    "pings_successful": 0
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-26T10:47:28.150526+00:00",
+      "detected": true,
+      "issue_type": "configuration_ospf_network_statement_missing",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "configuration_ospf_network_statement_missing",
+          "cause": "r2_is_not_advertising_the_172_16_0_0_24_lan_into_ospf_so_other_routers_do_not_have_an_ospf_route_to_172_16_0_0_and_traffic_from_192_168_0_11_is_not_being_routed_to_172_16_0_11",
+          "confidence": 0.92,
+          "evidence": [
+            "R2 running-config: interface GigabitEthernet0/0/0 ip address 172.16.0.1/24 (R2 has the 172.16.0.0/24 LAN configured).",
+            "R2 OSPF config (running-config) shows network statements: \"network\": [{\"ip\": \"10.0.0.0\", ...}, {\"ip\": \"10.0.0.4\", ...}] — 172.16.0.0/24 is absent from R2's ospf network list.",
+            "get_ospf output for R2 lists only Serial0/1/0 and Serial0/1/1 as OSPF interfaces (no GigabitEthernet0/0/0/172.16.0.0 advertisement)."
+          ]
+        },
+        {
+          "type": "routing_missing_route_on_r1_to_destination_network",
+          "cause": "r1_does_not_have_an_ospf_route_for_172_16_0_0_24_consequence_of_r2_not_advertising_the_lan_so_r1_will_not_forward_icmp_from_192_168_0_11_to_172_16_0_11",
+          "confidence": 0.84,
+          "evidence": [
+            "R1 OSPF advertisement list (get_ospf) includes networks for Serial0/1/0, Serial0/1/1 and 192.168.0.0 but does not include 172.16.0.0/24.",
+            "R1 running-config shows GigabitEthernet0/0/0 ip 192.168.0.1/24 (source-side LAN present) and R1's Serial0/1/0 connects to R2 — but OSPF on R1 does not list 172.16.0.0, implying no learned/advertised route to the destination network."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-26T10:47:48.050262+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "R2 is not advertising 172.16.0.0/24 into OSPF, so R1 lacks a route to 172.16.0.11 and ICMP from 192.168.0.11 fails. Restore OSPF advertisement so R1 learns the route and ping connectivity is restored.",
+      "needs_fix": true,
+      "problem": "172.16.0.0/24 is not being advertised by router2 into OSPF; router1 has no route to 172.16.0.0/24, causing loss of reachability to 172.16.0.11.",
+      "fix_summary": "Add OSPF network statement for 172.16.0.0/24 on router2's GigabitEthernet0/0/0 (assume OSPF process 1, area 0) to advertise the LAN into OSPF so router1 learns the route.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "add_ospf_network",
+          "target": "GigabitEthernet0/0/0",
+          "parameters": [
+            "process_id=1",
+            "network=172.16.0.0/24",
+            "area=0"
+          ]
+        }
+      ],
+      "step_count": 1
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": [
+        "get_ospf output for R2 (most-recent) still shows GigabitEthernet0/0/0 in state \"Waiting\" and the OSPF interface list does not explicitly show an advertisement of 172.16.0.0/24 (tool call call_1WJCAiNNrq6c7GJCeAVis8uz). Verify whether the 172.16.0.0/24 was actually added to R2's OSPF network statements or whether a temporary/static route was used to restore reachability."
+      ]
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-26T10:47:54.515451+00:00",
+      "changes": [
+        {
+          "tool": "add_ospf_network",
+          "args": {
+            "router_name": "router2",
+            "process_id": 1,
+            "ip_network": "172.16.0.0",
+            "wildcard": "0.0.0.255",
+            "area": 0
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 30.6,
+      "diagnose_s": 27.9,
+      "remediate_s": 5.7,
+      "verify_s": 41.0,
+      "total_s": 212.2
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 1,
+      "collect_changes": 1,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 10,
+      "tool_calls_pre_diagnosis": 6,
+      "tool_calls_remediation": 1,
+      "tool_calls_verify": 3,
+      "remediation_attempts": 1,
+      "plan_steps": 1,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 1
+    },
+    "tokens": {
+      "total_prompt_tokens": 47751,
+      "total_completion_tokens": 19379,
+      "total_tokens": 67130
+    }
+  }
+}

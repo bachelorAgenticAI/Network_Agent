@@ -1,0 +1,128 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_ospf_route_advertisement_missing_01",
+    "started_at": "2026-05-26T10:50:06.211633+00:00",
+    "ended_at": "2026-05-26T10:52:47.419681+00:00"
+  },
+  "input_alert": {
+    "alert_type": "network_reachability",
+    "source_network": "192.168.0.11",
+    "destination_ip": "172.16.0.11",
+    "pings_sent": 25,
+    "pings_successful": 0
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-26T10:51:54.878227+00:00",
+      "detected": true,
+      "issue_type": "ospf_route_advertisement_missing",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "ospf_route_advertisement_missing",
+          "cause": "r2_s_ospf_configuration_does_not_include_the_172_16_0_0_24_lan_so_r2_is_not_advertising_that_network_into_ospf_other_routers_r1_therefore_have_no_ospf_learned_route_to_172_16_0_0_24_and_cannot_forward_traffic_from_192_168_0_11_to_172_16_0_11",
+          "confidence": 0.9,
+          "evidence": [
+            "R2 interface GigabitEthernet0/0/0 ip 172.16.0.1/24 (running-config from get_running_config for R2).",
+            "R2 OSPF process 1 network statements: only 10.0.0.0 (wildcard 0.0.0.3) and 10.0.0.4 (wildcard 0.0.0.3) are present — 172.16.0.0/24 is absent (R2 running-config ospf block).",
+            "R1 OSPF process includes networks 10.0.0.0, 10.0.0.8 and 192.168.0.0 but does not list 172.16.0.0 (R1 running-config ospf block).",
+            "OSPF adjacencies between R1-R2-R3 are full (get_ospf outputs show ospf-nbr-full), so adjacencies/up links are functional and the missing advertisement is a configuration omission rather than a link outage."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-26T10:52:11.327473+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "Source 192.168.0.11 cannot reach destination 172.16.0.11 (25 pings sent, 0 successful). Impact: destination unreachable; desired outcome: restore IP connectivity so pings to 172.16.0.11 succeed.",
+      "needs_fix": true,
+      "problem": "R2 is not advertising 172.16.0.0/24 into OSPF (OSPF process 1 missing network statement for 172.16.0.0/24), so other routers have no route to 172.16.0.0/24 and traffic from 192.168.0.11 cannot reach 172.16.0.11.",
+      "fix_summary": "Add 172.16.0.0/24 to R2's OSPF process so the network is advertised into OSPF.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "update_config",
+          "target": "ospf process 1",
+          "parameters": [
+            "Add OSPF network statement for 172.16.0.0/24: network 172.16.0.0 0.0.0.255 area 0 (so R2 advertises 172.16.0.0/24 via OSPF)."
+          ]
+        }
+      ],
+      "step_count": 1
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-26T10:52:15.363986+00:00",
+      "changes": [
+        {
+          "tool": "add_ospf_network",
+          "args": {
+            "router_name": "router2",
+            "process_id": 1,
+            "ip_network": "172.16.0.0",
+            "wildcard": "0.0.0.255",
+            "area": 0
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 26.7,
+      "diagnose_s": 24.7,
+      "remediate_s": 3.3,
+      "verify_s": 26.0,
+      "total_s": 161.2
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 1,
+      "collect_changes": 1,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 11,
+      "tool_calls_pre_diagnosis": 9,
+      "tool_calls_remediation": 1,
+      "tool_calls_verify": 1,
+      "remediation_attempts": 1,
+      "plan_steps": 1,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 1
+    },
+    "tokens": {
+      "total_prompt_tokens": 45472,
+      "total_completion_tokens": 16125,
+      "total_tokens": 61597
+    }
+  }
+}

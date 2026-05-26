@@ -1,0 +1,132 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_routing_ospf_advertisement_missing_01",
+    "started_at": "2026-05-26T10:15:12.312406+00:00",
+    "ended_at": "2026-05-26T10:18:09.896079+00:00"
+  },
+  "input_alert": {
+    "alert_type": "network_reachability",
+    "source_network": "192.168.0.11",
+    "destination_ip": "172.16.0.11",
+    "pings_sent": 25,
+    "pings_successful": 0
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-26T10:17:06.602035+00:00",
+      "detected": true,
+      "issue_type": "routing_ospf_advertisement_missing",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "routing_ospf_advertisement_missing",
+          "cause": "r2_is_not_advertising_its_lan_172_16_0_0_24_into_ospf_so_r1_has_no_learned_route_to_172_16_0_11_as_a_result_packets_from_192_168_0_11_are_not_routed_to_the_172_16_0_0_24_network",
+          "confidence": 0.9,
+          "evidence": [
+            "R2 GigabitEthernet0/0/0 configured as 172.16.0.1/24 (R2 config).",
+            "R2 OSPF process networks: listed 10.0.0.0 and 10.0.0.4 (no 172.16.0.0 network statement) — R2 ospf config shows only \"10.0.0.0\" and \"10.0.0.4\" under networks.",
+            "R1 OSPF process networks include 192.168.0.0 and the transit 10.0.0.0 network (R1 ospf includes \"10.0.0.0\" and \"192.168.0.0\"); R1 has no 'routing' section (null), indicating it relies on OSPF to learn remote subnets."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-26T10:17:27.520194+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "R2 is not advertising 172.16.0.0/24 into OSPF, so R1 has no route to 172.16.0.11; restore OSPF advertisement of the 172.16.0.0/24 LAN so 192.168.0.11 can reach 172.16.0.11.",
+      "needs_fix": true,
+      "problem": "R2 is not advertising its 172.16.0.0/24 LAN into OSPF; remote hosts cannot be reached from 192.168.0.11 because R1 has no learned route to 172.16.0.0/24.",
+      "fix_summary": "Configure R2 to advertise 172.16.0.0/24 into OSPF by adding the appropriate network statement (area 0) so R1 learns the route to 172.16.0.11.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "add_ospf_network_statement",
+          "target": "172.16.0.0/24",
+          "parameters": [
+            "interface GigabitEthernet0/0/0",
+            "network 172.16.0.0/24",
+            "wildcard 0.0.0.255",
+            "area 0"
+          ]
+        }
+      ],
+      "step_count": 1
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {
+        "ping_10_0_0_2_success": true
+      },
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-26T10:17:35.527860+00:00",
+      "changes": [
+        {
+          "tool": "add_ospf_network",
+          "args": {
+            "router_name": "router2",
+            "process_id": 1,
+            "ip_network": "172.16.0.0",
+            "wildcard": "0.0.0.255",
+            "area": 0
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 31.2,
+      "diagnose_s": 40.6,
+      "remediate_s": 7.2,
+      "verify_s": 27.7,
+      "total_s": 177.6
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 1,
+      "collect_changes": 1,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 8,
+      "tool_calls_pre_diagnosis": 3,
+      "tool_calls_remediation": 1,
+      "tool_calls_verify": 4,
+      "remediation_attempts": 1,
+      "plan_steps": 1,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 1
+    },
+    "tokens": {
+      "total_prompt_tokens": 32974,
+      "total_completion_tokens": 12712,
+      "total_tokens": 45686
+    }
+  }
+}

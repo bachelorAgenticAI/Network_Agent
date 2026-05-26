@@ -1,0 +1,132 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_routing_missing_advertisement_01",
+    "started_at": "2026-05-26T10:54:19.014755+00:00",
+    "ended_at": "2026-05-26T10:57:06.906832+00:00"
+  },
+  "input_alert": {
+    "alert_type": "network_reachability",
+    "source_network": "192.168.0.11",
+    "destination_ip": "172.16.0.11",
+    "pings_sent": 25,
+    "pings_successful": 0
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-26T10:55:54.843640+00:00",
+      "detected": true,
+      "issue_type": "routing_missing_advertisement",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "routing_missing_advertisement",
+          "cause": "r2_s_lan_172_16_0_0_24_is_not_being_advertised_into_ospf_so_r1_and_the_rest_of_the_network_has_no_route_to_172_16_0_11_without_a_route_on_r1_the_ping_from_192_168_0_11_cannot_be_forwarded_to_172_16_0_11",
+          "confidence": 0.9,
+          "evidence": [
+            "R2 GigabitEthernet0/0/0 address 172.16.0.1/24 (R2 config)",
+            "R2 OSPF networks: entries for 10.0.0.0 and 10.0.0.4 (R2 OSPF config) — no 172.16.0.0/24 listed",
+            "R1 OSPF networks include 192.168.0.0 but do not include 172.16.0.0 (R1 OSPF config)"
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-26T10:56:16.837433+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "R2 is not advertising 172.16.0.0/24 into OSPF, so 192.168.0.11 cannot reach 172.16.0.11. Restore advertisement of 172.16.0.0/24 so the route is present network-wide and pings succeed.",
+      "needs_fix": true,
+      "problem": "R2's LAN 172.16.0.0/24 is missing from OSPF advertisements; R1 has no route to 172.16.0.11, causing 0/25 pings to fail.",
+      "fix_summary": "Add 172.16.0.0/24 to R2's OSPF advertisements (advertise network connected to GigabitEthernet0/0/0 into OSPF area 0).",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "add_ospf_network",
+          "target": "GigabitEthernet0/0/0",
+          "parameters": [
+            "network 172.16.0.0/24",
+            "area 0",
+            "assumed_ospf_process_id 1"
+          ]
+        }
+      ],
+      "step_count": 1
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": [
+        "Intermittent packet loss observed: 20% packet loss on the verification ping (4/5 success).",
+        "router2 GigabitEthernet0/0/0 is in OSPF interface state 'Waiting' with no neighbors — this may indicate the interface is passive or not fully integrated into OSPF. Recommend confirming that 172.16.0.0/24 is persistently advertised in R2's OSPF config (network statement or passive-interface settings) to prevent regression."
+      ]
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-26T10:56:24.312047+00:00",
+      "changes": [
+        {
+          "tool": "add_ospf_network",
+          "args": {
+            "router_name": "router2",
+            "process_id": 1,
+            "ip_network": "172.16.0.0",
+            "wildcard": "0.0.0.255",
+            "area": 0
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 28.1,
+      "diagnose_s": 23.7,
+      "remediate_s": 6.6,
+      "verify_s": 36.3,
+      "total_s": 167.9
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 1,
+      "collect_changes": 1,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 6,
+      "tool_calls_pre_diagnosis": 3,
+      "tool_calls_remediation": 1,
+      "tool_calls_verify": 2,
+      "remediation_attempts": 1,
+      "plan_steps": 1,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 1
+    },
+    "tokens": {
+      "total_prompt_tokens": 39318,
+      "total_completion_tokens": 14589,
+      "total_tokens": 53907
+    }
+  }
+}
