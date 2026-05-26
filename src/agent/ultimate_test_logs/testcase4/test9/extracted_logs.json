@@ -1,0 +1,131 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_access_control_list_acl_blocking_traffic_01",
+    "started_at": "2026-05-26T12:40:54.273180+00:00",
+    "ended_at": "2026-05-26T12:44:06.498536+00:00"
+  },
+  "input_alert": {
+    "alert_type": "network_reachability",
+    "source_network": "192.168.0.11",
+    "destination_ip": "172.16.0.11",
+    "pings_sent": 25,
+    "pings_successful": 0
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-26T12:42:55.994574+00:00",
+      "detected": true,
+      "issue_type": "access_control_list_acl_blocking_traffic",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "access_control_list_acl_blocking_traffic",
+          "cause": "r1_has_an_inbound_acl_on_serial0_1_0_r1_in_that_explicitly_denies_icmp_from_the_172_16_0_0_24_network_this_will_drop_icmp_echo_replies_from_172_16_0_11_back_to_192_168_0_11_causing_the_observed_0_25_ping_replies",
+          "confidence": 0.95,
+          "evidence": [
+            "R1 running-config: Serial0/1/0 contains ip access-group in R1_IN (access-group applied inbound).",
+            "R1 access_lists (R1_IN) entry sequence 10: action = deny, protocol = icmp, ipv4-address = 172.16.0.0, mask = 0.0.0.255, dst-eq-port2 = echo (shows explicit deny of ICMP from 172.16.0.0/24).",
+            "Alert: 25 pings from 192.168.0.11 to 172.16.0.11 with 0 replies (indicates echo requests likely forwarded but replies were dropped).",
+            "OSPF adjacency between R1 and R2 is full on Serial0/1/0 (R1 sees neighbor 2.2.2.2 at 10.0.0.2), indicating routing between R1 and R2 is up and pointing to an ACL-related drop rather than a routing/adjacency failure."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-26T12:43:15.452550+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "ICMP reachability failure: 25 pings sent from 192.168.0.11 to 172.16.0.11 with 0 successful replies, causing loss of connectivity to 172.16.0.11. Desired outcome: restore IP reachability from 192.168.0.11 to 172.16.0.11.",
+      "needs_fix": true,
+      "problem": "Inbound ACL R1_IN applied on router1 Serial0/1/0 explicitly denies ICMP from 172.16.0.0/24, dropping echo-replies from 172.16.0.11 and causing 0/25 ping replies.",
+      "fix_summary": "Insert a permit ICMP rule into ACL R1_IN on router1 (Serial0/1/0) before the explicit deny so echo-replies from 172.16.0.11 to 192.168.0.11 are allowed.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router1",
+          "action": "update_access_list",
+          "target": "Serial0/1/0",
+          "parameters": [
+            "acl_name=R1_IN",
+            "operation=insert",
+            "position=before sequence 10",
+            "rule=permit icmp host 172.16.0.11 host 192.168.0.11"
+          ]
+        }
+      ],
+      "step_count": 1
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-26T12:43:28.139305+00:00",
+      "changes": [
+        {
+          "tool": "create_extended_acl",
+          "args": {
+            "router_name": "router1",
+            "acl_name": "R1_IN",
+            "sequence": 5,
+            "action": "permit",
+            "protocol": "icmp"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 30.0,
+      "diagnose_s": 14.6,
+      "remediate_s": 11.9,
+      "verify_s": 32.1,
+      "total_s": 192.2
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 1,
+      "collect_changes": 1,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 11,
+      "tool_calls_pre_diagnosis": 9,
+      "tool_calls_remediation": 1,
+      "tool_calls_verify": 1,
+      "remediation_attempts": 1,
+      "plan_steps": 1,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 1
+    },
+    "tokens": {
+      "total_prompt_tokens": 47359,
+      "total_completion_tokens": 17030,
+      "total_tokens": 64389
+    }
+  }
+}
