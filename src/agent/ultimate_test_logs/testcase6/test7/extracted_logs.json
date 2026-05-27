@@ -1,0 +1,156 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_configuration_acl_blocking_ospf_01",
+    "started_at": "2026-05-27T07:57:13.594177+00:00",
+    "ended_at": "2026-05-27T07:59:55.158799+00:00"
+  },
+  "input_alert": {
+    "alert_type": "routing_adjacency",
+    "device": "R2",
+    "protocol": "OSPF",
+    "status": "down"
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-27T07:58:39.652187+00:00",
+      "detected": true,
+      "issue_type": "configuration_acl_blocking_ospf",
+      "device": "R2",
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "configuration_acl_blocking_ospf",
+          "cause": "r2_has_an_inbound_acl_on_serial0_1_0_that_explicitly_denies_ospf_multicast_224_0_0_5_and_224_0_0_6_preventing_r2_from_receiving_r1_s_ospf_hellos_and_blocking_adjacency_formation",
+          "confidence": 0.9,
+          "evidence": [
+            "R2 running-config: Serial0/1/0 shows an access-group inbound: 'access-group: in -> acl-name: R2_IN' (interface Serial0/1/0).",
+            "R2 ACL 'R2_IN' contains sequence 10: 'deny ip any dst-host 224.0.0.5' and sequence 20: 'deny ip any dst-host 224.0.0.6' (these are OSPF multicast addresses).",
+            "R2 OSPF output: Serial0/1/0 interface has no neighbors (neighbors: []).",
+            "R1 OSPF output: Serial0/1/0 shows neighbor 2.2.2.2 (10.0.0.2) in state 'ospf-nbr-init' (R1 is receiving R2's hellos but R2 is not receiving R1's hellos)."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-27T07:58:54.990234+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "OSPF adjacency on R2 is down because inbound ACL R2_IN on Serial0/1/0 denies OSPF multicast (224.0.0.5 and 224.0.0.6); restore adjacency by allowing OSPF hellos to R2.",
+      "needs_fix": true,
+      "problem": "Inbound ACL R2_IN on router2 Serial0/1/0 contains deny entries for OSPF multicast (224.0.0.5 and 224.0.0.6), preventing R2 from receiving OSPF hellos and forming adjacency with R1.",
+      "fix_summary": "Remove the two deny entries (sequence 10 and 20) from ACL R2_IN on router2 (Serial0/1/0) so OSPF multicast traffic is allowed. Risk: briefly permits multicast traffic previously blocked by these entries.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "remove_acl_entry",
+          "target": "R2_IN",
+          "parameters": [
+            "interface: Serial0/1/0",
+            "sequence: 10",
+            "entry: deny ip any dst-host 224.0.0.5"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router2",
+          "action": "remove_acl_entry",
+          "target": "R2_IN",
+          "parameters": [
+            "interface: Serial0/1/0",
+            "sequence: 20",
+            "entry: deny ip any dst-host 224.0.0.6"
+          ]
+        }
+      ],
+      "step_count": 2
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-27T07:59:08.161537+00:00",
+      "changes": [
+        {
+          "tool": "delete_acl",
+          "args": {
+            "router_name": "router2",
+            "acl_name": "R2_IN",
+            "acl_type": "extended"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-27T07:59:21.512770+00:00",
+      "changes": [
+        {
+          "tool": "detach_acl_from_interface",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "Serial0/1/0",
+            "direction": "in"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 2,
+      "remediation_step_idx": 2,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 24.5,
+      "diagnose_s": 23.2,
+      "remediate_s": 24.7,
+      "verify_s": 27.5,
+      "total_s": 161.6
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 2,
+      "collect_changes": 2,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 12,
+      "tool_calls_pre_diagnosis": 6,
+      "tool_calls_remediation": 2,
+      "tool_calls_verify": 4,
+      "remediation_attempts": 2,
+      "plan_steps": 2,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 2
+    },
+    "tokens": {
+      "total_prompt_tokens": 48354,
+      "total_completion_tokens": 14115,
+      "total_tokens": 62469
+    }
+  }
+}
