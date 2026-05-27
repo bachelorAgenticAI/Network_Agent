@@ -1,0 +1,134 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_dhcp_configuration_error_wrong_default_gateway_01",
+    "started_at": "2026-05-27T11:28:58.284132+00:00",
+    "ended_at": "2026-05-27T11:31:43.540335+00:00"
+  },
+  "input_alert": {
+    "alert_type": "server_connectivity",
+    "destination_ip": "172.16.0.12",
+    "pings_sent": 25,
+    "pings_successful": 0
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-27T11:30:44.647454+00:00",
+      "detected": true,
+      "issue_type": "dhcp_configuration_error_wrong_default_gateway",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "dhcp_configuration_error_wrong_default_gateway",
+          "cause": "r2_s_dhcp_pool_for_the_172_16_0_0_24_lan_is_configured_to_hand_out_192_168_0_1_as_the_default_gateway_not_an_address_in_172_16_0_0_24_hosts_including_172_16_0_12_if_obtained_via_dhcp_would_therefore_use_an_incorrect_gateway_and_replies_to_remote_pings_would_not_return_via_r2_causing_the_observed_unreachable_condition",
+          "confidence": 0.9,
+          "evidence": [
+            "R2 DHCP pool R2_LAN: network 172.16.0.0/24 (get_dhcp_config on R2)",
+            "R2 DHCP pool R2_LAN default-router: 192.168.0.1 (get_dhcp_config on R2)",
+            "R2 interface GigabitEthernet0/0/0 IP: 172.16.0.1/24 (get_running_config on R2)",
+            "R2 DHCP excluded-address list: 172.16.0.1 - 172.16.0.10 (get_dhcp_config on R2) — indicates DHCP is active for this subnet"
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": [
+        "What is the IP configuration on the server 172.16.0.12 (IP, netmask, default gateway)?",
+        "Is 172.16.0.12 currently reachable from R2 (show ip arp | ping from R2 to 172.16.0.12) and is there an ARP entry on R2 for that IP?",
+        "Is 172.16.0.12 using DHCP (and thus likely received the incorrect gateway) or a static IP?"
+      ]
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-27T11:31:02.186770+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "Server 172.16.0.12 is unreachable because R2's DHCP pool R2_LAN is handing out an incorrect default gateway (192.168.0.1) to hosts in 172.16.0.0/24; desired outcome is to restore ICMP reachability by correcting the DHCP default-router to the router's LAN IP 172.16.0.1.",
+      "needs_fix": true,
+      "problem": "R2 DHCP pool R2_LAN (network 172.16.0.0/24) is configured with default-router 192.168.0.1, causing hosts (including 172.16.0.12) to use an incorrect gateway and be unreachable.",
+      "fix_summary": "Change DHCP pool R2_LAN on router2 to set default-router to 172.16.0.1.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "update_dhcp_pool",
+          "target": null,
+          "parameters": [
+            "pool=R2_LAN",
+            "default-router=172.16.0.1"
+          ]
+        }
+      ],
+      "step_count": 1
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {
+        "ping_10_0_0_2_success": true
+      },
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-27T11:31:13.775568+00:00",
+      "changes": [
+        {
+          "tool": "create_dhcp_pool",
+          "args": {
+            "router_name": "router2",
+            "pool_id": "R2_LAN",
+            "network": "172.16.0.0",
+            "mask": "255.255.255.0",
+            "default_router": "172.16.0.1"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 26.3,
+      "diagnose_s": 28.2,
+      "remediate_s": 10.7,
+      "verify_s": 21.3,
+      "total_s": 165.3
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 1,
+      "collect_changes": 1,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 13,
+      "tool_calls_pre_diagnosis": 9,
+      "tool_calls_remediation": 1,
+      "tool_calls_verify": 3,
+      "remediation_attempts": 1,
+      "plan_steps": 1,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 1
+    },
+    "tokens": {
+      "total_prompt_tokens": 38839,
+      "total_completion_tokens": 13798,
+      "total_tokens": 52637
+    }
+  }
+}

@@ -1,0 +1,128 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_misconfigured_dhcp_default_gateway_01",
+    "started_at": "2026-05-27T10:59:23.944154+00:00",
+    "ended_at": "2026-05-27T11:02:52.024427+00:00"
+  },
+  "input_alert": {
+    "alert_type": "server_connectivity",
+    "destination_ip": "172.16.0.12",
+    "pings_sent": 25,
+    "pings_successful": 0
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-27T11:01:50.792781+00:00",
+      "detected": true,
+      "issue_type": "misconfigured_dhcp_default_gateway",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "misconfigured_dhcp_default_gateway",
+          "cause": "r2_s_dhcp_pool_for_the_172_16_0_0_24_lan_is_handing_out_the_wrong_default_gateway_192_168_0_1_so_hosts_e_g_172_16_0_12_will_use_an_unreachable_incorrect_next_hop_and_replies_to_remote_pings_will_be_sent_to_the_wrong_router",
+          "confidence": 0.9,
+          "evidence": [
+            "Alert: Host 172.16.0.12 unreachable (0/25 ICMP pings).",
+            "get_dhcp_config:router2 (R2_LAN) -> default-router list: [\"192.168.0.1\"] (should be an address on 172.16.0.0/24).",
+            "get_running_config:router2 -> GigabitEthernet0/0/0 address: 172.16.0.1/24 (R2's LAN gateway IP is 172.16.0.1).",
+            "get_running_config:router2 and get_ospf:router2 -> OSPF is advertising 172.16.0.0/24 from R2 (so network presence and inter-router routing are functioning).",
+            "get_running_config:router2 -> DHCP excluded-address list contains 172.16.0.1-172.16.0.10, indicating DHCP is intended to serve the 172.16.0.0/24 LAN."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-27T11:02:12.392132+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "Host 172.16.0.12 is unreachable because R2's DHCP pool is handing out the wrong default gateway (192.168.0.1). Desired outcome: update DHCP on R2 so hosts receive 172.16.0.1 as their default gateway and restore reachability.",
+      "needs_fix": true,
+      "problem": "DHCP pool R2_LAN on router2 has default-router set to 192.168.0.1, causing 172.16.0.0/24 hosts (e.g., 172.16.0.12) to use an incorrect/unreachable gateway.",
+      "fix_summary": "Change DHCP pool R2_LAN on router2 to set default-router to 172.16.0.1.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "update_dhcp_pool",
+          "target": "R2_LAN",
+          "parameters": [
+            "default-router=172.16.0.1"
+          ]
+        }
+      ],
+      "step_count": 1
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-27T11:02:21.852224+00:00",
+      "changes": [
+        {
+          "tool": "create_dhcp_pool",
+          "args": {
+            "router_name": "router2",
+            "pool_id": "R2_LAN",
+            "network": "172.16.0.0",
+            "mask": "255.255.255.0",
+            "default_router": "172.16.0.1"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 31.7,
+      "diagnose_s": 22.2,
+      "remediate_s": 8.6,
+      "verify_s": 20.6,
+      "total_s": 208.1
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 1,
+      "collect_changes": 1,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 11,
+      "tool_calls_pre_diagnosis": 9,
+      "tool_calls_remediation": 1,
+      "tool_calls_verify": 1,
+      "remediation_attempts": 1,
+      "plan_steps": 1,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 1
+    },
+    "tokens": {
+      "total_prompt_tokens": 52338,
+      "total_completion_tokens": 15879,
+      "total_tokens": 68217
+    }
+  }
+}
