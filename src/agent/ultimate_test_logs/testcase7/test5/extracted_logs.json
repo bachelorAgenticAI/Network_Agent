@@ -1,0 +1,222 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_configuration_error_routing_01",
+    "started_at": "2026-05-27T09:36:10.231256+00:00",
+    "ended_at": "2026-05-27T09:39:07.006031+00:00"
+  },
+  "input_alert": {
+    "alert_type": "network_reachability",
+    "source_network": "192.168.0.12",
+    "destination_ip": "172.16.0.12",
+    "event": "ping_timeout",
+    "pings_sent": 25,
+    "pings_successful": 0
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-27T09:37:30.297992+00:00",
+      "detected": true,
+      "issue_type": "configuration_error_routing",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "configuration_error_routing",
+          "cause": "reciprocal_static_next_hop_routes_for_172_16_0_0_24_on_r1_and_r3_cause_packets_for_172_16_0_12_to_be_forwarded_back_and_forth_blackholed_instead_of_reaching_the_destination",
+          "confidence": 0.9,
+          "evidence": [
+            "R1 routing: \"prefix\": \"172.16.0.0\", \"mask\": \"255.255.255.0\", \"fwd-list\": [{\"fwd\": \"10.0.0.9\"}]",
+            "R3 routing: \"prefix\": \"172.16.0.0\", \"mask\": \"255.255.255.0\", \"fwd-list\": [{\"fwd\": \"10.0.0.10\"}]",
+            "R1 interface Serial0/1/1 ip = 10.0.0.10 (description: Link to R3)",
+            "R3 interface Serial0/1/0 ip = 10.0.0.9 (description: Link to R1)"
+          ]
+        },
+        {
+          "type": "missing_incorrect_route_advertisement_or_next_hop_for_destination_network",
+          "cause": "no_evidence_that_the_172_16_0_0_24_network_is_locally_attached_to_either_r1_or_r3_intended_path_via_router2_may_be_absent_or_not_being_advertised_used_so_172_16_0_12_is_not_reachable_via_a_correct_next_hop",
+          "confidence": 0.45,
+          "evidence": [
+            "Topology shows R1 and R3 also linked to 'router2' (R1 Serial0/1/0 description 'Link to R2', R3 Serial0/1/1 description 'Link to R2') but neither R1 nor R3 have a route to 172.16.0.0 that points at router2.",
+            "Attempted fetch for router2 running-config failed: \"All connection attempts failed\" (no config available to confirm routing/advertisement)"
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-27T09:37:58.904061+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "Fix routing so 172.16.0.12 is reachable from 192.168.0.12 by removing reciprocal static next-hops between R1 and R3 and pointing the 172.16.0.0/24 route to router2 (so traffic is forwarded toward the correct router instead of being blackholed).",
+      "needs_fix": true,
+      "problem": "Reciprocal static routes on router1 and router3 for 172.16.0.0/24 forward packets to each other (10.0.0.9 <-> 10.0.0.10), causing reachability loss to 172.16.0.12. Missing confirmation that router2 advertises/hosts 172.16.0.0/24; remediation assumes router2 is the correct next-hop and is reachable at 10.0.0.11. Missing info: router2 link IPs and router2 routing/advertisement state.",
+      "fix_summary": "Remove incorrect static routes that point 172.16.0.0/24 at the opposite router, and add static routes on R1 and R3 pointing 172.16.0.0/24 to router2 (assumed next-hop 10.0.0.11).",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router1",
+          "action": "remove_static_route",
+          "target": "172.16.0.0/24",
+          "parameters": [
+            "next-hop=10.0.0.9"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router1",
+          "action": "add_static_route",
+          "target": "172.16.0.0/24",
+          "parameters": [
+            "next-hop=10.0.0.11"
+          ]
+        },
+        {
+          "id": 3,
+          "device": "router3",
+          "action": "remove_static_route",
+          "target": "172.16.0.0/24",
+          "parameters": [
+            "next-hop=10.0.0.10"
+          ]
+        },
+        {
+          "id": 4,
+          "device": "router3",
+          "action": "add_static_route",
+          "target": "172.16.0.0/24",
+          "parameters": [
+            "next-hop=10.0.0.11"
+          ]
+        }
+      ],
+      "step_count": 4
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": [
+        "No confirmation that router2 actually hosts or advertises 172.16.0.0/24 — pointing R1/R3 at 10.0.0.11 fixes the routing-loop/blackhole but we cannot confirm the destination network is present on router2.",
+        "router2 running-config fetch previously failed (All connection attempts failed); router2 state remains unknown."
+      ]
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-27T09:38:06.766953+00:00",
+      "changes": [
+        {
+          "tool": "delete_static_route",
+          "args": {
+            "router_name": "router1",
+            "network": "172.16.0.0",
+            "mask": "255.255.255.0"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-27T09:38:12.824941+00:00",
+      "changes": [
+        {
+          "tool": "add_static_route",
+          "args": {
+            "router_name": "router1",
+            "network": "172.16.0.0",
+            "mask": "255.255.255.0",
+            "next_hop": "10.0.0.11"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 2,
+      "remediation_step_idx": 2,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-27T09:38:19.370539+00:00",
+      "changes": [
+        {
+          "tool": "delete_static_route",
+          "args": {
+            "router_name": "router3",
+            "network": "172.16.0.0",
+            "mask": "255.255.255.0"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 3,
+      "remediation_step_idx": 3,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-27T09:38:24.367394+00:00",
+      "changes": [
+        {
+          "tool": "add_static_route",
+          "args": {
+            "router_name": "router3",
+            "network": "172.16.0.0",
+            "mask": "255.255.255.0",
+            "next_hop": "10.0.0.11"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 4,
+      "remediation_step_idx": 4,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 35.7,
+      "diagnose_s": 21.1,
+      "remediate_s": 22.9,
+      "verify_s": 34.1,
+      "total_s": 176.8
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 4,
+      "collect_changes": 4,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 9,
+      "tool_calls_pre_diagnosis": 3,
+      "tool_calls_remediation": 4,
+      "tool_calls_verify": 2,
+      "remediation_attempts": 4,
+      "plan_steps": 4,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 4
+    },
+    "tokens": {
+      "total_prompt_tokens": 49753,
+      "total_completion_tokens": 19096,
+      "total_tokens": 68849
+    }
+  }
+}

@@ -1,0 +1,226 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_misconfigured_routing_mutual_static_routes_01",
+    "started_at": "2026-05-27T09:50:16.098434+00:00",
+    "ended_at": "2026-05-27T09:53:14.627074+00:00"
+  },
+  "input_alert": {
+    "alert_type": "network_reachability",
+    "source_network": "192.168.0.12",
+    "destination_ip": "172.16.0.12",
+    "event": "ping_timeout",
+    "pings_sent": 25,
+    "pings_successful": 0
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-27T09:51:36.825311+00:00",
+      "detected": true,
+      "issue_type": "misconfigured_routing_mutual_static_routes",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "misconfigured_routing_mutual_static_routes",
+          "cause": "both_r1_and_r3_have_static_host_routes_for_172_16_0_0_24_that_point_at_each_other_r1_10_0_0_9_r3_10_0_0_10_traffic_from_192_168_0_12_destined_to_172_16_0_12_will_be_forwarded_r1_r3_then_r3_r1_instead_of_toward_the_actual_network_producing_a_forwarding_loop_blackhole_and_causing_all_pings_to_fail",
+          "confidence": 0.9,
+          "evidence": [
+            "R1 routing entry: prefix 172.16.0.0 mask 255.255.255.0 fwd-list: fwd = 10.0.0.9 (ToolMessage: get_running_config for R1)",
+            "R3 routing entry: prefix 172.16.0.0 mask 255.255.255.0 fwd-list: fwd = 10.0.0.10 (ToolMessage: get_running_config for R3)",
+            "Interface addressing shows R1 Serial0/1/1 = 10.0.0.10 and R3 Serial0/1/0 = 10.0.0.9 (matching the above next-hops), so each router points the 172.16.0.0/24 next-hop at the other router."
+          ]
+        },
+        {
+          "type": "down_unreachable_intermediate_router",
+          "cause": "the_intermediate_router_router2_that_likely_hosts_or_connects_the_172_16_0_0_24_network_is_unreachable_so_the_true_path_to_172_16_0_12_is_not_available",
+          "confidence": 0.8,
+          "evidence": [
+            "Topology and recent_changes show inferred links R1->router2 and R3->router2 but 'router2 was unreachable during an attempted running-config fetch' (facts and recent_changes).",
+            "get_running_config for router2 returned: { \"error\": \"All connection attempts failed\" } (ToolMessage)",
+            "R1 has Serial0/1/0 configured as 'Link to R2' (10.0.0.1/30) and R3 has Serial0/1/1 as 'Link to R2' (10.0.0.6/30) — the physical/adjacent router that would reach 172.16.0.0/24 cannot be reached via management/tooling."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-27T09:52:03.585936+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "192.168.0.12 cannot reach 172.16.0.12 (25/0 pings). Root cause: R1 and R3 have reciprocal static routes for 172.16.0.0/24 pointing at each other, causing a forwarding loop/blackhole; router2 (true path to 172.16.0.0/24) is currently unreachable. Desired outcome: restore correct routing so 192.168.0.12 can reach 172.16.0.12.",
+      "needs_fix": true,
+      "problem": "Mutual static routes on router1 and router3 point 172.16.0.0/24 at each other (next-hops 10.0.0.9 and 10.0.0.10), producing a forwarding loop. Router2 (the correct next-hop toward 172.16.0.0/24) was unreachable to tools; assumed router2 link addresses are 10.0.0.2 (toward router1) and 10.0.0.5 (toward router3). Missing info: definitive router2 next-hop addresses.",
+      "fix_summary": "On router1 and router3 remove the incorrect static route for 172.16.0.0/24 that points at the other router, and add static routes pointing toward the assumed router2 next-hops (router1->10.0.0.2, router3->10.0.0.5). Risk: if router2 remains down/unreachable, ICMP reachability may still fail.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router1",
+          "action": "remove_static_route",
+          "target": "172.16.0.0/24",
+          "parameters": [
+            "prefix=172.16.0.0/24",
+            "next_hop=10.0.0.9"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router1",
+          "action": "add_static_route",
+          "target": "172.16.0.0/24",
+          "parameters": [
+            "prefix=172.16.0.0/24",
+            "next_hop=10.0.0.2"
+          ]
+        },
+        {
+          "id": 3,
+          "device": "router3",
+          "action": "remove_static_route",
+          "target": "172.16.0.0/24",
+          "parameters": [
+            "prefix=172.16.0.0/24",
+            "next_hop=10.0.0.10"
+          ]
+        },
+        {
+          "id": 4,
+          "device": "router3",
+          "action": "add_static_route",
+          "target": "172.16.0.0/24",
+          "parameters": [
+            "prefix=172.16.0.0/24",
+            "next_hop=10.0.0.5"
+          ]
+        }
+      ],
+      "step_count": 4
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": [
+        "router2 remains unreachable to the management tooling (get_running_config:router2 returned \"All connection attempts failed\"); if router2 itself is down the 172.16.0.0/24 network may still be unreachable even though static routes on R1/R3 were corrected.",
+        "End-to-end host-to-host reachability (e.g., ping from 192.168.0.12 to 172.16.0.12) was not performed by the verification tools and therefore is not confirmed."
+      ]
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-27T09:52:14.308747+00:00",
+      "changes": [
+        {
+          "tool": "delete_static_route",
+          "args": {
+            "router_name": "router1",
+            "network": "172.16.0.0",
+            "mask": "255.255.255.0"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-27T09:52:19.116341+00:00",
+      "changes": [
+        {
+          "tool": "add_static_route",
+          "args": {
+            "router_name": "router1",
+            "network": "172.16.0.0",
+            "mask": "255.255.255.0",
+            "next_hop": "10.0.0.2"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 2,
+      "remediation_step_idx": 2,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-27T09:52:28.533686+00:00",
+      "changes": [
+        {
+          "tool": "delete_static_route",
+          "args": {
+            "router_name": "router3",
+            "network": "172.16.0.0",
+            "mask": "255.255.255.0"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 3,
+      "remediation_step_idx": 3,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-27T09:52:35.263216+00:00",
+      "changes": [
+        {
+          "tool": "add_static_route",
+          "args": {
+            "router_name": "router3",
+            "network": "172.16.0.0",
+            "mask": "255.255.255.0",
+            "next_hop": "10.0.0.5"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 4,
+      "remediation_step_idx": 4,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 32.3,
+      "diagnose_s": 25.3,
+      "remediate_s": 29.0,
+      "verify_s": 31.6,
+      "total_s": 178.5
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 4,
+      "collect_changes": 4,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 10,
+      "tool_calls_pre_diagnosis": 3,
+      "tool_calls_remediation": 4,
+      "tool_calls_verify": 3,
+      "remediation_attempts": 4,
+      "plan_steps": 4,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 4
+    },
+    "tokens": {
+      "total_prompt_tokens": 47194,
+      "total_completion_tokens": 17556,
+      "total_tokens": 64750
+    }
+  }
+}
