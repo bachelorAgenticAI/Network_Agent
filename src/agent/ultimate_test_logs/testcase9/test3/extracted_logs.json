@@ -1,0 +1,160 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_dhcp_misconfiguration_r2_01",
+    "started_at": "2026-05-27T12:28:09.975312+00:00",
+    "ended_at": "2026-05-27T12:31:27.828875+00:00"
+  },
+  "input_alert": {
+    "alert_type": "server_connectivity",
+    "destination_ip": "172.16.0.12",
+    "pings_sent": 25,
+    "pings_successful": 0
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-27T12:30:05.158200+00:00",
+      "detected": true,
+      "issue_type": "dhcp_misconfiguration_r2",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "dhcp_misconfiguration_r2",
+          "cause": "r2_s_dhcp_configuration_excludes_the_entire_172_16_0_0_24_network_172_16_0_1_172_16_0_254_leaving_no_addresses_available_for_dynamic_allocation_if_172_16_0_12_is_expected_to_be_dhcp_assigned_it_would_not_be_receiving_an_ip_and_therefore_would_be_unreachable",
+          "confidence": 0.8,
+          "evidence": [
+            "R2 get_dhcp_config: excluded-address low-address = \"172.16.0.1\", high-address = \"172.16.0.254\"",
+            "R2 get_dhcp_config: pool R2_LAN network = \"172.16.0.0\" mask = \"255.255.255.0\"",
+            "Alert: target=172.16.0.12 — 25 ICMP pings sent, 0 successful"
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": [
+        "Is host 172.16.0.12 expected to be DHCP-assigned or statically configured?",
+        "R2: show ip arp 172.16.0.12 (or equivalent) to see if ARP/MAC exists for .12",
+        "R2: show ip interface brief | include GigabitEthernet0/0/0 (confirm interface up/up and IP presence) or confirmation of LAN switch port/mac learning for the host"
+      ]
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-27T12:30:25.305382+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "Host 172.16.0.12 is unreachable (25 ICMP pings failed) because R2's DHCP config excludes the entire 172.16.0.0/24 pool; goal: restore DHCP assignment and reachability for 172.16.0.12.",
+      "needs_fix": true,
+      "problem": "R2 DHCP pool 'R2_LAN' has an excluded-address range covering 172.16.0.1-172.16.0.254, leaving no addresses available for DHCP clients (including 172.16.0.12).",
+      "fix_summary": "Remove the erroneous DHCP excluded-address range on router2 for pool R2_LAN and clear the DHCP binding for 172.16.0.12 so the host can obtain an address. Operational risk: brief DHCP service impact to R2_LAN during change.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "remove_dhcp_excluded_range",
+          "target": "R2_LAN",
+          "parameters": [
+            "low=172.16.0.1",
+            "high=172.16.0.254"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router2",
+          "action": "clear_dhcp_binding",
+          "target": "172.16.0.12",
+          "parameters": [
+            "ip=172.16.0.12"
+          ]
+        }
+      ],
+      "step_count": 2
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {
+        "ping_10_0_0_2_success": true
+      },
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-27T12:30:33.915663+00:00",
+      "changes": [
+        {
+          "tool": "delete_dhcp_excluded_address",
+          "args": {
+            "router_name": "router2",
+            "low_address": "172.16.0.1",
+            "high_address": "172.16.0.254"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-27T12:30:53.076762+00:00",
+      "changes": [
+        {
+          "tool": "create_dhcp_pool",
+          "args": {
+            "router_name": "router2",
+            "pool_id": "R2_LAN",
+            "network": "172.16.0.0",
+            "mask": "255.255.255.0",
+            "default_router": "172.16.0.1"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 2,
+      "remediation_step_idx": 2,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 31.9,
+      "diagnose_s": 26.8,
+      "remediate_s": 26.2,
+      "verify_s": 24.9,
+      "total_s": 197.9
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 2,
+      "collect_changes": 2,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 14,
+      "tool_calls_pre_diagnosis": 9,
+      "tool_calls_remediation": 2,
+      "tool_calls_verify": 3,
+      "remediation_attempts": 2,
+      "plan_steps": 2,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 2
+    },
+    "tokens": {
+      "total_prompt_tokens": 53396,
+      "total_completion_tokens": 16435,
+      "total_tokens": 69831
+    }
+  }
+}
