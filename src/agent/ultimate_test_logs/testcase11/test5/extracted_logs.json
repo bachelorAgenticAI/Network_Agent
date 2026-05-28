@@ -1,0 +1,153 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_unknown_01",
+    "started_at": "2026-05-28T08:01:47.026435+00:00",
+    "ended_at": "2026-05-28T08:05:26.126075+00:00"
+  },
+  "input_alert": {
+    "alert_type": "network_reachability",
+    "source_network": "192.168.0.12",
+    "destination_ip": "172.16.0.12",
+    "pings_sent": 25,
+    "pings_successful": 0
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-28T08:03:39.101661+00:00",
+      "detected": false,
+      "issue_type": "unknown",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [],
+      "needs_fix": true,
+      "missing_info": [
+        "Provide 'show ip interface brief' from R1 and R2 (to confirm interface states and IPs are up and match the running-config).",
+        "Provide 'show ip route' from R1 and R2 (to confirm each router has a route to the remote LAN: 172.16.0.0/24 on R1 and 192.168.0.0/24 on R2).",
+        "From the routers: run 'ping 172.16.0.12' on R1 and 'ping 192.168.0.12' on R2 and paste the full results (to determine whether routers can reach the hosts).",
+        "Provide ARP entries from R1 and R2 for the hosts: 'show ip arp 172.16.0.12' and 'show ip arp 192.168.0.12' (to verify MAC learning/host L2 reachability).",
+        "Provide the IP configuration (IP address, mask, default gateway) and local firewall status for both end hosts 192.168.0.12 and 172.16.0.12 (to confirm correct host settings and that host firewalls are not blocking ICMP)."
+      ]
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-28T08:04:10.376071+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "Restore IP reachability between 192.168.0.12 and 172.16.0.12 (25 ICMP probes from 192.168.0.12 to 172.16.0.12 all failed). Desired outcome: hosts on 192.168.0.0/24 and 172.16.0.0/24 can reach each other.",
+      "needs_fix": true,
+      "problem": "ICMP from 192.168.0.12 to 172.16.0.12 failing (25/25 lost). Likely missing IP routes between 192.168.0.0/24 and 172.16.0.0/24 on the edge routers.",
+      "fix_summary": "Add static routes on router1 and router2 so each LAN has a route to the opposite LAN via the router-to-router transit link (assume transit 10.0.0.0/30 with router1=10.0.0.1 and router2=10.0.0.2).",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router1",
+          "action": "add_static_route",
+          "target": "172.16.0.0/24",
+          "parameters": [
+            "prefix=172.16.0.0/24",
+            "next_hop=10.0.0.2"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router2",
+          "action": "add_static_route",
+          "target": "192.168.0.0/24",
+          "parameters": [
+            "prefix=192.168.0.0/24",
+            "next_hop=10.0.0.1"
+          ]
+        }
+      ],
+      "step_count": 2
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {
+        "ping_10_0_0_2_success": true
+      },
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-28T08:04:21.506038+00:00",
+      "changes": [
+        {
+          "tool": "add_static_route",
+          "args": {
+            "router_name": "router1",
+            "network": "172.16.0.0",
+            "mask": "255.255.255.0",
+            "next_hop": "10.0.0.2"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T08:04:30.421710+00:00",
+      "changes": [
+        {
+          "tool": "add_static_route",
+          "args": {
+            "router_name": "router2",
+            "network": "192.168.0.0",
+            "mask": "255.255.255.0",
+            "next_hop": "10.0.0.1"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 2,
+      "remediation_step_idx": 2,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 39.0,
+      "diagnose_s": 28.4,
+      "remediate_s": 18.5,
+      "verify_s": 40.5,
+      "total_s": 219.1
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 2,
+      "collect_changes": 2,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 15,
+      "tool_calls_pre_diagnosis": 3,
+      "tool_calls_remediation": 2,
+      "tool_calls_verify": 10,
+      "remediation_attempts": 2,
+      "plan_steps": 2,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 2
+    },
+    "tokens": {
+      "total_prompt_tokens": 39898,
+      "total_completion_tokens": 13498,
+      "total_tokens": 53396
+    }
+  }
+}

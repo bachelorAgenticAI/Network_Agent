@@ -1,0 +1,153 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_unknown_01",
+    "started_at": "2026-05-28T07:24:14.553918+00:00",
+    "ended_at": "2026-05-28T07:27:43.635339+00:00"
+  },
+  "input_alert": {
+    "alert_type": "network_reachability",
+    "source_network": "192.168.0.12",
+    "destination_ip": "172.16.0.12",
+    "pings_sent": 25,
+    "pings_successful": 0
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-28T07:26:00.741036+00:00",
+      "detected": false,
+      "issue_type": "unknown",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [],
+      "needs_fix": true,
+      "missing_info": [
+        "On R1: show ip route 172.16.0.0/24 (or show ip route 172.16.0.12) — verify R1 has a route to the 172.16.0.0/24 network and how it is learned.",
+        "On R2: show ip route 192.168.0.0/24 (or show ip route 192.168.0.12) — verify R2 has a route to the 192.168.0.0/24 network and how it is learned.",
+        "On R1 and R2: show ip ospf neighbor — confirm OSPF adjacencies between R1↔R2 (and R1/R2↔R3) are up.",
+        "On R1 and R2: show ip interface brief (or show interfaces) — confirm relevant interfaces (Gig0/0/0, Serial0/1/0 on R1; Gig0/0/0, Serial0/1/0 on R2) are up/up and have expected IPs.",
+        "On R1 and R2: show access-lists R1_TO_R2 and show access-lists R2_TO_R1 (or show ip access-lists) — provide hit counts to see whether ACLs are dropping ICMP or related traffic.",
+        "On R1: show arp 172.16.0.12 (or show ip arp) and on R2: show arp 192.168.0.12 — confirm ARP/resolution for the hosts (or whether replies reach the routers).",
+        "From R1: traceroute 172.16.0.12 (or ping 172.16.0.12 with increased TTL/debug) and capture where packets stop — to determine the hop where ICMP is dropped."
+      ]
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-28T07:26:28.748617+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "ICMP unreachable: host 192.168.0.12 cannot reach 172.16.0.12 (25 pings sent, 0 successful). Impact: cross-subnet connectivity broken. Desired outcome: restore IP reachability between 192.168.0.0/24 and 172.16.0.0/24.",
+      "needs_fix": true,
+      "problem": "No route or forwarding path between 192.168.0.0/24 and 172.16.0.0/24 causing 0/25 ICMP success.",
+      "fix_summary": "Install static routes on the edge routers so each router has a route to the remote subnet (temporary fix until dynamic routing/OSPF adjacency is confirmed).",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router1",
+          "action": "add_static_route",
+          "target": "172.16.0.0/24",
+          "parameters": [
+            "172.16.0.0/24",
+            "10.0.12.2"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router2",
+          "action": "add_static_route",
+          "target": "192.168.0.0/24",
+          "parameters": [
+            "192.168.0.0/24",
+            "10.0.12.1"
+          ]
+        }
+      ],
+      "step_count": 2
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-28T07:26:36.483824+00:00",
+      "changes": [
+        {
+          "tool": "add_static_route",
+          "args": {
+            "router_name": "router1",
+            "network": "172.16.0.0",
+            "mask": "255.255.255.0",
+            "next_hop": "10.0.12.2"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T07:26:45.479761+00:00",
+      "changes": [
+        {
+          "tool": "add_static_route",
+          "args": {
+            "router_name": "router2",
+            "network": "192.168.0.0",
+            "mask": "255.255.255.0",
+            "next_hop": "10.0.12.1"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 2,
+      "remediation_step_idx": 2,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 37.0,
+      "diagnose_s": 33.2,
+      "remediate_s": 15.1,
+      "verify_s": 48.5,
+      "total_s": 209.1
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 2,
+      "collect_changes": 2,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 15,
+      "tool_calls_pre_diagnosis": 3,
+      "tool_calls_remediation": 2,
+      "tool_calls_verify": 10,
+      "remediation_attempts": 2,
+      "plan_steps": 2,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 2
+    },
+    "tokens": {
+      "total_prompt_tokens": 42645,
+      "total_completion_tokens": 16231,
+      "total_tokens": 58876
+    }
+  }
+}
