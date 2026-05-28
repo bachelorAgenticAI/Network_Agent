@@ -1,0 +1,328 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_threshold_exceeded_link_negotiation_speed_duplex_issue_01",
+    "started_at": "2026-05-28T11:51:00.701604+00:00",
+    "ended_at": "2026-05-28T11:58:05.995952+00:00"
+  },
+  "input_alert": {
+    "type": "threshold_exceeded",
+    "device": "R2",
+    "interface": "GigabitEthernet0/0/1",
+    "metric": "input_errors",
+    "errors_since_last_check": 18
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-28T11:52:44.776901+00:00",
+      "detected": true,
+      "issue_type": "physical_layer_receive_errors_most_likely",
+      "device": "R2",
+      "interface": "GigabitEthernet0/0/1",
+      "root_causes_ranked": [
+        {
+          "type": "physical_layer_receive_errors_most_likely",
+          "cause": "receive_side_errors_on_gi0_0_1_bad_cable_sfp_module_or_remote_interface_hardware_phy_issue_causing_18_input_errors_while_transmit_remains_clean",
+          "confidence": 0.8,
+          "evidence": [
+            "input_errors = 18 (get_interface_status)",
+            "output_errors = 0 (get_interface_status)",
+            "drops = 0 and oper_state = up (get_interface_status) — indicates errors are seen only on RX"
+          ]
+        },
+        {
+          "type": "telemetry_counter_reporting_incomplete_possible_blocks_precise_diagnosis",
+          "cause": "key_diagnostic_fields_are_null_crc_errors_duplex_bandwidth_utilization_so_the_platform_did_not_provide_per_error_type_counters_needed_to_pinpoint_whether_errors_are_crc_frame_alignment_or_other",
+          "confidence": 0.6,
+          "evidence": [
+            "crc_errors = null (get_interface_status)",
+            "duplex = null (get_interface_status)",
+            "bandwidth_utilization = null (get_interface_status)"
+          ]
+        },
+        {
+          "type": "transient_link_disturbance_less_likely",
+          "cause": "a_short_duration_event_link_noise_brief_flaps_or_neighbor_side_issue_produced_a_small_burst_18_of_input_errors_since_the_last_check_and_may_not_be_ongoing",
+          "confidence": 0.4,
+          "evidence": [
+            "input_errors = 18 (moderate count not extremely high)",
+            "last_change = 2026-05-28T12:51:08.000077+00:00 (interface state recently recorded; could reflect recent transient)",
+            "output_errors = 0 and drops = 0 (no sustained transmit-side problems)"
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": [
+        "Historical/previous counter values for input_errors (to know if 18 is new/incremental or cumulative and whether it is rising)",
+        "Full 'show interfaces GigabitEthernet0/0/1' (detailed error breakdown: runts, giants, CRC, frame, alignment, input queue drops, link partner speed/duplex)",
+        "Remote neighbor interface counters and link parameters (to check for duplex/negotiation mismatch or remote errors)",
+        "Physical-layer data: SFP/module type and status and cable test results (if available) to confirm hardware/cable issues"
+      ]
+    },
+    {
+      "ts": "2026-05-28T11:56:27.997935+00:00",
+      "detected": true,
+      "issue_type": "link_negotiation_speed_duplex_issue",
+      "device": "R2",
+      "interface": "GigabitEthernet0/0/1",
+      "root_causes_ranked": [
+        {
+          "type": "link_negotiation_speed_duplex_issue",
+          "cause": "interface_is_not_operating_at_expected_gigabit_speed_and_duplex_information_is_missing_indicating_a_negotiation_fallback_or_mismatch_that_can_cause_receive_only_input_errors",
+          "confidence": 0.65,
+          "evidence": [
+            "oper_state = up, admin_state = up",
+            "speed_bps = 102400000 (reported speed not 1,000,000,000 for a GigabitEthernet port)",
+            "duplex = null",
+            "input_errors = 18, output_errors = 0"
+          ]
+        },
+        {
+          "type": "physical_layer_receive_fault_local",
+          "cause": "cable_connector_or_local_transceiver_sfp_fault_causing_corrupted_errored_frames_on_receive_while_transmit_remains_clean",
+          "confidence": 0.55,
+          "evidence": [
+            "input_errors = 18 (RX-only errors are present)",
+            "output_errors = 0 and drops = 0 (errors confined to receive direction)",
+            "Interface remains up (oper/admin up) while errors persist across multiple observations (same input_errors value in successive snapshots)"
+          ]
+        },
+        {
+          "type": "physical_layer_receive_fault_remote_transmitter",
+          "cause": "faulty_corrupted_transmissions_from_the_link_partner_remote_device_causing_input_errors_on_r2",
+          "confidence": 0.3,
+          "evidence": [
+            "input_errors = 18 with no local transmit errors (output_errors = 0)",
+            "oper_state = up (link is established so the errors likely originate from received frames)"
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": [
+        "Link-partner interface status (speed, duplex, error counters) for the device connected to R2 GigabitEthernet0/0/1",
+        "Detailed interface counters from R2 GigabitEthernet0/0/1 (CRC, frame, runt, giant counts and timestamped deltas)",
+        "Media type and transceiver/cable details for Gi0/0/1 (fiber vs copper, SFP model, cable type/length) and any optical/PHY diagnostics"
+      ]
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-28T11:53:10.953750+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "R2 GigabitEthernet0/0/1 has 18 input_errors (RX-only). Likely physical-layer receive faults; goal: stop RX errors and restore clean input counters.",
+      "needs_fix": true,
+      "problem": "Receive-side input errors (18) on router2 interface GigabitEthernet0/0/1, likely caused by cable/SFP or remote PHY; telemetry lacks per-error breakdown.",
+      "fix_summary": "Perform non-disruptive physical diagnostics, clear counters, soft-reset the interface, then replace transceiver/cable if errors persist.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "run_cable_test",
+          "target": "GigabitEthernet0/0/1",
+          "parameters": [
+            "include_sfp_diagnostics=true"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router2",
+          "action": "clear_interface_counters",
+          "target": "GigabitEthernet0/0/1",
+          "parameters": [
+            "reason=baseline_after_diagnostics"
+          ]
+        },
+        {
+          "id": 3,
+          "device": "router2",
+          "action": "reset_interface",
+          "target": "GigabitEthernet0/0/1",
+          "parameters": [
+            "method=soft_reset"
+          ]
+        },
+        {
+          "id": 4,
+          "device": "router2",
+          "action": "replace_sfp",
+          "target": "GigabitEthernet0/0/1",
+          "parameters": [
+            "replace_with=known_good_transceiver_or_patch_cable"
+          ]
+        }
+      ],
+      "step_count": 4
+    },
+    {
+      "ts": "2026-05-28T11:57:01.445873+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "R2 GigabitEthernet0/0/1 has 18 input_errors (RX-only). Likely physical-layer receive faults; goal: stop RX errors and restore clean input counters.",
+      "needs_fix": true,
+      "problem": "Interface router2 GigabitEthernet0/0/1 is receiving errors (input_errors=18) with reported speed inconsistent with 1Gbps and duplex unset — likely speed/duplex negotiation mismatch or physical receive fault causing RX-only errors.",
+      "fix_summary": "1) Collect full, timestamped interface counters and link attributes. 2) Force the interface to 1Gbps full-duplex to eliminate negotiation mismatch. Risk: forcing speed/duplex may cause link loss if the remote partner is configured differently; perform during maintenance window if traffic-sensitive.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "get_interface_status",
+          "target": null,
+          "parameters": [
+            "GigabitEthernet0/0/1",
+            "request=full_counters_and_timestamps"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router2",
+          "action": "set_interface_speed_duplex",
+          "target": null,
+          "parameters": [
+            "GigabitEthernet0/0/1",
+            "speed=1000000000",
+            "duplex=full"
+          ]
+        }
+      ],
+      "step_count": 2
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": false,
+      "evidence": {},
+      "remaining_issues": [
+        "router2 GigabitEthernet0/0/1 still has input_errors = 18 (RX errors remain).",
+        "Interface speed is reported as 102,400,000 bps (not 1,000,000,000 bps expected for Gigabit).",
+        "Duplex is null/unknown (link duplex not negotiated or not reported).",
+        "CRC/error detail fields are null or missing (crc_errors = null), preventing root-cause identification."
+      ]
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-28T11:53:24.107510+00:00",
+      "changes": [
+        {
+          "tool": "get_interface_status",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "GigabitEthernet0/0/1"
+          },
+          "result": "unknown"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T11:53:51.455443+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "GigabitEthernet0/0/1",
+            "state": "down"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 2,
+      "remediation_step_idx": 2,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T11:54:12.440509+00:00",
+      "changes": [],
+      "change_count": 0,
+      "total_change_count": 3,
+      "remediation_step_idx": 3,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T11:54:30.459141+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "GigabitEthernet0/0/1",
+            "state": "up"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 4,
+      "remediation_step_idx": 4,
+      "remediation_done": true
+    },
+    {
+      "ts": "2026-05-28T11:57:08.274126+00:00",
+      "changes": [],
+      "change_count": 0,
+      "total_change_count": 5,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T11:57:30.431513+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "GigabitEthernet0/0/1",
+            "state": "speed=1000000000 duplex=full"
+          },
+          "result": "error"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 6,
+      "remediation_step_idx": 2,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 79.8,
+      "diagnose_s": 56.6,
+      "remediate_s": 103.3,
+      "verify_s": 47.3,
+      "total_s": 425.3
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 4,
+      "get_info": 2,
+      "format_network": 2,
+      "diagnose": 2,
+      "remediation": 6,
+      "collect_changes": 6,
+      "verify": 2,
+      "assess_verify": 2,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 11,
+      "tool_calls_pre_diagnosis": 2,
+      "tool_calls_remediation": 6,
+      "tool_calls_verify": 3,
+      "remediation_attempts": 6,
+      "plan_steps": 2,
+      "diagnoses_created": 2,
+      "plans_created": 2,
+      "execution_updates": 6
+    },
+    "tokens": {
+      "total_prompt_tokens": 82138,
+      "total_completion_tokens": 30826,
+      "total_tokens": 112964
+    }
+  }
+}

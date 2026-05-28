@@ -1,0 +1,180 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_threshold_exceeded_configuration_mismatch_duplex_speed_01",
+    "started_at": "2026-05-28T12:55:12.548258+00:00",
+    "ended_at": "2026-05-28T13:01:43.207527+00:00"
+  },
+  "input_alert": {
+    "type": "threshold_exceeded",
+    "device": "R1",
+    "interface": "GigabitEthernet0/0/1",
+    "metric": "input_errors",
+    "errors_since_last_check": 13
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-28T12:57:06.717168+00:00",
+      "detected": true,
+      "issue_type": "speed_duplex_negotiation_mismatch",
+      "device": "R1",
+      "interface": "GigabitEthernet0/0/1",
+      "root_causes_ranked": [
+        {
+          "type": "speed_duplex_negotiation_mismatch",
+          "cause": "r2_has_the_gi0_0_1_interface_hard_set_to_100mbps_half_duplex_while_r1_is_left_to_auto_negotiate_producing_a_duplex_speed_mismatch_on_the_link_and_elevated_input_errors_on_both_ends",
+          "confidence": 0.9,
+          "evidence": [
+            "R2 running-config: \"Cisco-IOS-XE-ethernet:speed\": { \"value-100\": [ null ] }, \"Cisco-IOS-XE-ethernet:duplex\": \"half\", \"Cisco-IOS-XE-ethernet:negotiation\": { \"auto\": false } (call_I0zMlKkbm9xyzlTXKQP9cZfX).",
+            "R1 running-config: GigabitEthernet0/0/1 \"Cisco-IOS-XE-ethernet:negotiation\": { \"auto\": true } (call_DMAWt7eypvR6DPUUWutRCSn3).",
+            "Interface operational facts: router1 GigabitEthernet0/0/1 input_errors 94, output_errors 0 (get_interface_status:call_IQSPJhf6Vm420ipuYRHzGJaw).",
+            "Interface operational facts: router2 GigabitEthernet0/0/1 input_errors 92, output_errors 0 (get_interface_status:call_bnroDfsv6uhQKVQ83Ox1W4jE).",
+            "Both interfaces are up with speed reported as 102400000 (100Mbps) while duplex is not reported by the status probe (suggesting one side forced, the other negotiated): get_interface_status outputs for both interfaces."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    },
+    {
+      "ts": "2026-05-28T13:00:37.454936+00:00",
+      "detected": true,
+      "issue_type": "configuration_mismatch_duplex_speed",
+      "device": "R1",
+      "interface": "GigabitEthernet0/0/1",
+      "root_causes_ranked": [
+        {
+          "type": "configuration_mismatch_duplex_speed",
+          "cause": "router2_gigabitethernet0_0_1_is_configured_with_speed_forced_to_100_and_duplex_forced_to_half_while_router1_gigabitethernet0_0_1_is_set_to_auto_negotiate_causing_a_duplex_speed_mismatch_that_produced_elevated_input_errors_on_both_ends",
+          "confidence": 0.95,
+          "evidence": [
+            "R2 running-config: \"Cisco-IOS-XE-ethernet:speed\": { \"value-100\": [ null ] }, \"Cisco-IOS-XE-ethernet:duplex\": \"half\", \"Cisco-IOS-XE-ethernet:negotiation\": { \"auto\": false } (get_running_config for R2)",
+            "R1 running-config: \"Cisco-IOS-XE-ethernet:negotiation\": { \"auto\": true } on GigabitEthernet0/0/1 (get_running_config for R1)",
+            "R1 interface status GigabitEthernet0/0/1: admin_state=up, oper_state=up, speed=\"102400000\", input_errors=94, last_change=2026-05-28T13:44:23... (get_interface_status for R1)",
+            "R2 interface status GigabitEthernet0/0/1: admin_state=up, oper_state=up, speed=\"102400000\", input_errors=92, last_change=2026-05-28T13:44:20... (get_interface_status for R2)"
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-28T12:57:19.110341+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "Duplex/speed mismatch on routers causing elevated input_errors on GigabitEthernet0/0/1; goal is to restore matching negotiation and eliminate input errors.",
+      "needs_fix": true,
+      "problem": "R2 GigabitEthernet0/0/1 is hard-set to 100Mbps half-duplex while R1 is auto-negotiating, causing a speed/duplex mismatch and elevated input_errors on both interfaces.",
+      "fix_summary": "Enable auto-negotiation on router2 GigabitEthernet0/0/1 so both ends negotiate speed/duplex consistently (match R1), restoring link health and clearing input errors over time.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "set_interface_negotiation",
+          "target": "GigabitEthernet0/0/1",
+          "parameters": [
+            "negotiation=auto"
+          ]
+        }
+      ],
+      "step_count": 1
+    },
+    {
+      "ts": "2026-05-28T13:00:53.396786+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "Duplex/speed mismatch: router2 GigabitEthernet0/0/1 is forced to 100/half while router1 GigabitEthernet0/0/1 is auto-negotiating, causing elevated input_errors on both interfaces. Desired outcome: enable matching auto-negotiation to eliminate input_errors.",
+      "needs_fix": true,
+      "problem": "Router2 GigabitEthernet0/0/1 is configured speed=100 and duplex=half with negotiation disabled, causing a duplex/speed mismatch with Router1 (auto) and elevated input_errors on both interfaces.",
+      "fix_summary": "Enable auto-negotiation on router2 GigabitEthernet0/0/1 to match router1 and remove input_errors (restore proper speed/duplex negotiation).",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "set_interface_negotiation",
+          "target": "GigabitEthernet0/0/1",
+          "parameters": [
+            "auto"
+          ]
+        }
+      ],
+      "step_count": 1
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": false,
+      "evidence": {},
+      "remaining_issues": [
+        "Router2 GigabitEthernet0/0/1 still has negotiation auto=false, duplex forced to half, and speed forced to 100 — configuration mismatch remains.",
+        "Elevated input_errors remain on both Router1 and Router2 GigabitEthernet0/0/1 (R1: 94, R2: 92)."
+      ]
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-28T12:57:32.524050+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_description",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "GigabitEthernet0/0/1",
+            "description": "negotiation=auto"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    },
+    {
+      "ts": "2026-05-28T13:01:10.786113+00:00",
+      "changes": [],
+      "change_count": 0,
+      "total_change_count": 2,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 46.9,
+      "diagnose_s": 25.9,
+      "remediate_s": 28.8,
+      "verify_s": 42.5,
+      "total_s": 390.7
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 4,
+      "get_info": 2,
+      "format_network": 2,
+      "diagnose": 2,
+      "remediation": 2,
+      "collect_changes": 2,
+      "verify": 2,
+      "assess_verify": 2,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 19,
+      "tool_calls_pre_diagnosis": 11,
+      "tool_calls_remediation": 2,
+      "tool_calls_verify": 6,
+      "remediation_attempts": 2,
+      "plan_steps": 1,
+      "diagnoses_created": 2,
+      "plans_created": 2,
+      "execution_updates": 2
+    },
+    "tokens": {
+      "total_prompt_tokens": 94647,
+      "total_completion_tokens": 33458,
+      "total_tokens": 128105
+    }
+  }
+}
