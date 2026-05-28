@@ -1,0 +1,268 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_oper_state_change_unknown_01",
+    "started_at": "2026-05-27T13:46:41.306717+00:00",
+    "ended_at": "2026-05-27T13:51:23.675887+00:00"
+  },
+  "input_alert": {
+    "type": "oper_state_change",
+    "device": "R2",
+    "interface": "Serial0/1/1",
+    "old_oper_state": "up",
+    "new_oper_state": "lower-layer-down",
+    "old_admin_state": "up",
+    "new_admin_state": "up"
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-27T13:48:45.953062+00:00",
+      "detected": false,
+      "issue_type": "unknown",
+      "device": "R2",
+      "interface": "Serial0/1/1",
+      "root_causes_ranked": [],
+      "needs_fix": true,
+      "missing_info": [
+        "Collected telemetry shows R2 Serial0/1/1 and R3 Serial0/1/1 as admin/up oper/up; there is no tool evidence supporting the alert states (R2 oper=lower-layer-down admin=up and R3 oper=down admin=down). I cannot diagnose without time-correlated data. Please provide the minimum items below captured at or immediately around the alert time (timestamps required):",
+        "1) Timestamped interface-status output for R2 Serial0/1/1 (show interface or get_interface_status) including admin_state, oper_state, last_change, input_errors, output_errors, CRC/errors.",
+        "2) Timestamped interface-status output for R3 Serial0/1/1 (same fields as above).",
+        "3) Syslog or configuration-change/audit entries for R2 and R3 covering ±10 minutes around the alert (messages showing interface down/up, link type changes, or any 'shutdown'/'no shutdown' commands).",
+        "4) The exact alert timestamp and the source/system that reported the interface states (so I can correlate with the provided telemetry)."
+      ]
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-27T13:49:12.622182+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "R2 Serial0/1/1 reported oper=lower-layer-down admin=up and R3 Serial0/1/1 reported oper=down admin=down, causing loss of those serial links; desired outcome is to restore the interfaces to oper=up if unintended, or confirm/record intentional admin-down state and remove the alert.",
+      "needs_fix": true,
+      "problem": "Conflicting telemetry for R2 Serial0/1/1 and R3 Serial0/1/1: alert reports interfaces down but collected telemetry is inconsistent/missing; root cause unknown.",
+      "fix_summary": "Collect time-correlated interface status and syslog/audit data for R2 and R3 around the alert time; do not apply configuration changes until telemetry and change history are confirmed.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "collect_interface_status",
+          "target": "Serial0/1/1",
+          "parameters": [
+            "timestamp",
+            "admin_state",
+            "oper_state",
+            "last_change",
+            "input_errors",
+            "output_errors",
+            "crc_errors"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router3",
+          "action": "collect_interface_status",
+          "target": "Serial0/1/1",
+          "parameters": [
+            "timestamp",
+            "admin_state",
+            "oper_state",
+            "last_change",
+            "input_errors",
+            "output_errors",
+            "crc_errors"
+          ]
+        },
+        {
+          "id": 3,
+          "device": "router2",
+          "action": "collect_syslog",
+          "target": null,
+          "parameters": [
+            "start_time_relative:-10m",
+            "end_time_relative:+10m",
+            "filter:interface Serial0/1/1 OR (shutdown OR no shutdown) OR link"
+          ]
+        },
+        {
+          "id": 4,
+          "device": "router3",
+          "action": "collect_syslog",
+          "target": null,
+          "parameters": [
+            "start_time_relative:-10m",
+            "end_time_relative:+10m",
+            "filter:interface Serial0/1/1 OR (shutdown OR no shutdown) OR link"
+          ]
+        },
+        {
+          "id": 5,
+          "device": "router2",
+          "action": "collect_config_audit",
+          "target": null,
+          "parameters": [
+            "start_time_relative:-10m",
+            "end_time_relative:+10m",
+            "filter:changes to interface Serial0/1/1, shutdown/no shutdown"
+          ]
+        },
+        {
+          "id": 6,
+          "device": "router3",
+          "action": "collect_config_audit",
+          "target": null,
+          "parameters": [
+            "start_time_relative:-10m",
+            "end_time_relative:+10m",
+            "filter:changes to interface Serial0/1/1, shutdown/no shutdown"
+          ]
+        },
+        {
+          "id": 7,
+          "device": "router2",
+          "action": "report_alert_source",
+          "target": null,
+          "parameters": [
+            "request:exact alert timestamp and reporting system that generated the oper/admin-state alert for Serial0/1/1"
+          ]
+        }
+      ],
+      "step_count": 7
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-27T13:49:19.529811+00:00",
+      "changes": [
+        {
+          "tool": "get_interface_status",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "Serial0/1/1"
+          },
+          "result": "unknown"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-27T13:49:24.679949+00:00",
+      "changes": [
+        {
+          "tool": "get_interface_status",
+          "args": {
+            "router_name": "router3",
+            "interface_name": "Serial0/1/1"
+          },
+          "result": "unknown"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 2,
+      "remediation_step_idx": 2,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-27T13:49:44.663786+00:00",
+      "changes": [
+        {
+          "tool": "get_running_config",
+          "args": {
+            "router_name": "router2"
+          },
+          "result": "unknown"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 3,
+      "remediation_step_idx": 3,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-27T13:50:00.375590+00:00",
+      "changes": [
+        {
+          "tool": "get_running_config",
+          "args": {
+            "router_name": "router3"
+          },
+          "result": "unknown"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 4,
+      "remediation_step_idx": 4,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-27T13:50:14.333702+00:00",
+      "changes": [],
+      "change_count": 0,
+      "total_change_count": 5,
+      "remediation_step_idx": 5,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-27T13:50:29.209717+00:00",
+      "changes": [],
+      "change_count": 0,
+      "total_change_count": 6,
+      "remediation_step_idx": 6,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-27T13:50:41.657046+00:00",
+      "changes": [],
+      "change_count": 0,
+      "total_change_count": 7,
+      "remediation_step_idx": 7,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 34.3,
+      "diagnose_s": 15.9,
+      "remediate_s": 71.7,
+      "verify_s": 30.6,
+      "total_s": 282.4
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 7,
+      "collect_changes": 7,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 19,
+      "tool_calls_pre_diagnosis": 8,
+      "tool_calls_remediation": 7,
+      "tool_calls_verify": 4,
+      "remediation_attempts": 7,
+      "plan_steps": 7,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 7
+    },
+    "tokens": {
+      "total_prompt_tokens": 105372,
+      "total_completion_tokens": 21123,
+      "total_tokens": 126495
+    }
+  }
+}

@@ -1,0 +1,176 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_oper_state_change_unknown_01",
+    "started_at": "2026-05-27T13:52:03.434193+00:00",
+    "ended_at": "2026-05-27T13:55:07.661837+00:00"
+  },
+  "input_alert": {
+    "type": "oper_state_change",
+    "device": "R2",
+    "interface": "Serial0/1/1",
+    "old_oper_state": "up",
+    "new_oper_state": "lower-layer-down",
+    "old_admin_state": "up",
+    "new_admin_state": "up"
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-27T13:53:40.963568+00:00",
+      "detected": false,
+      "issue_type": "unknown",
+      "device": "R2",
+      "interface": "Serial0/1/1",
+      "root_causes_ranked": [],
+      "needs_fix": true,
+      "missing_info": [
+        "Exact timestamps of the oper-state changes for each interface and the source of the alert (syslog line/snmp-trap/monitoring timestamp) to correlate events.",
+        "Full 'show interfaces Serial0/1/1' output from R2 and from R3 taken at (or immediately before/after) the alert time (includes line protocol, error counters, last input/last output, CRC/errors).",
+        "'show controllers serial 0/1/1' (or platform equivalent) from both R2 and R3 for the alert time window to check DTE/DCE, clocking, carrier, and physical-layer alarms.",
+        "Buffered syslog or logging output from both routers covering ±5 minutes around the alert timestamps (to reveal interface flaps, clocking errors, link/line protocol messages, or configuration changes).",
+        "Records of any recent configuration changes or maintenance actions (who/what/when) affecting Serial0/1/1 on R2 or R3, including CLI commands (shut/no shut), clocking changes, or remote provider notifications."
+      ]
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-27T13:54:07.836535+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "R2 Serial0/1/1 moved to oper-state lower-layer-down while admin up; R3 Serial0/1/1 is administratively down (oper down). Goal: restore the serial link to operational up state.",
+      "needs_fix": true,
+      "problem": "R2 Serial0/1/1 oper=lower-layer-down, admin=up; R3 Serial0/1/1 oper=down, admin=down. The remote end (R3) is administratively down, preventing the link from coming up.",
+      "fix_summary": "Bring R3 Serial0/1/1 admin state to up (no shutdown) to restore the link. If the link does not return to up, perform an interface bounce on R2 Serial0/1/1 (shutdown then no shutdown). Risk: bouncing R2 interface will cause a brief outage on that link.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router3",
+          "action": "set_interface_admin_state",
+          "target": "Serial0/1/1",
+          "parameters": [
+            "up"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router2",
+          "action": "set_interface_admin_state",
+          "target": "Serial0/1/1",
+          "parameters": [
+            "down"
+          ]
+        },
+        {
+          "id": 3,
+          "device": "router2",
+          "action": "set_interface_admin_state",
+          "target": "Serial0/1/1",
+          "parameters": [
+            "up"
+          ]
+        }
+      ],
+      "step_count": 3
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-27T13:54:17.912270+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router3",
+            "interface_name": "Serial0/1/1",
+            "state": "up"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-27T13:54:28.394059+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "Serial0/1/1",
+            "state": "down"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 2,
+      "remediation_step_idx": 2,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-27T13:54:36.722926+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "Serial0/1/1",
+            "state": "up"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 3,
+      "remediation_step_idx": 3,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 38.0,
+      "diagnose_s": 13.6,
+      "remediate_s": 26.8,
+      "verify_s": 20.6,
+      "total_s": 184.2
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 3,
+      "collect_changes": 3,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 13,
+      "tool_calls_pre_diagnosis": 6,
+      "tool_calls_remediation": 3,
+      "tool_calls_verify": 4,
+      "remediation_attempts": 3,
+      "plan_steps": 3,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 3
+    },
+    "tokens": {
+      "total_prompt_tokens": 44686,
+      "total_completion_tokens": 14584,
+      "total_tokens": 59270
+    }
+  }
+}

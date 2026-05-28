@@ -1,0 +1,150 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_oper_state_change_unknown_01",
+    "started_at": "2026-05-28T07:07:42.082592+00:00",
+    "ended_at": "2026-05-28T07:11:35.943198+00:00"
+  },
+  "input_alert": {
+    "type": "oper_state_change",
+    "device": "R2",
+    "interface": "Serial0/1/1",
+    "old_oper_state": "up",
+    "new_oper_state": "lower-layer-down",
+    "old_admin_state": "up",
+    "new_admin_state": "up"
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-28T07:10:04.949464+00:00",
+      "detected": false,
+      "issue_type": "unknown",
+      "device": "R2",
+      "interface": "Serial0/1/1",
+      "root_causes_ranked": [],
+      "needs_fix": true,
+      "missing_info": [
+        "Latest interface status (including admin_state, oper_state, last_change) for R2 Serial0/1/1 and R3 Serial0/1/1 — e.g., output of 'show interface Serial0/1/1' or equivalent get_interface_status with timestamps.",
+        "Syslog / logging entries that show the state-change events for Serial0/1/1 on R2 and R3 (search for messages containing 'Serial0/1/1' and include timestamps) to correlate when 'lower-layer-down' or 'administratively down' occurred.",
+        "Running-config for R3 interface Serial0/1/1 (show running-config interface Serial0/1/1) to confirm whether 'shutdown' is configured or was applied recently."
+      ]
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-28T07:10:31.220697+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "R2 Serial0/1/1 is oper 'lower-layer-down' with admin up (likely physical/link-layer fault). R3 Serial0/1/1 is administratively down. Impact: possible loss of inter-router connectivity. Desired outcome: bring R3 Serial0/1/1 admin up and either restore R2 Serial0/1/1 to oper up or mark it admin down to reflect an intended outage.",
+      "needs_fix": true,
+      "problem": "R2 Serial0/1/1 operational 'lower-layer-down' while admin is up; R3 Serial0/1/1 is administratively down — inter-router link impaired.",
+      "fix_summary": "Bring R3 Serial0/1/1 admin up. Mark R2 Serial0/1/1 admin down to make state consistent until physical/link issue is resolved.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router3",
+          "action": "set_interface_admin_state",
+          "target": "Serial0/1/1",
+          "parameters": [
+            "admin_state=up"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router2",
+          "action": "set_interface_admin_state",
+          "target": "Serial0/1/1",
+          "parameters": [
+            "admin_state=down"
+          ]
+        }
+      ],
+      "step_count": 2
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": [
+        "Physical/link problem remains: R3 Serial0/1/1 oper_state is still \"lower-layer-down\", indicating the underlying link is not up and the adjacency is not restored.",
+        "Root cause not yet identified — further troubleshooting required (cabling, clocking, CSU/DSU, or remote side interface state)."
+      ]
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-28T07:10:39.283098+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router3",
+            "interface_name": "Serial0/1/1",
+            "state": "up"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T07:10:48.891032+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "Serial0/1/1",
+            "state": "down"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 2,
+      "remediation_step_idx": 2,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 42.5,
+      "diagnose_s": 16.5,
+      "remediate_s": 16.5,
+      "verify_s": 34.7,
+      "total_s": 233.9
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 2,
+      "collect_changes": 2,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 12,
+      "tool_calls_pre_diagnosis": 8,
+      "tool_calls_remediation": 2,
+      "tool_calls_verify": 2,
+      "remediation_attempts": 2,
+      "plan_steps": 2,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 2
+    },
+    "tokens": {
+      "total_prompt_tokens": 48437,
+      "total_completion_tokens": 15952,
+      "total_tokens": 64389
+    }
+  }
+}

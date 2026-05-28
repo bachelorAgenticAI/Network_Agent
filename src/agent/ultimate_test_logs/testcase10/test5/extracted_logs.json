@@ -1,0 +1,121 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_oper_state_change_unknown_01",
+    "started_at": "2026-05-28T06:57:28.311626+00:00",
+    "ended_at": "2026-05-28T07:01:00.394552+00:00"
+  },
+  "input_alert": {
+    "type": "oper_state_change",
+    "device": "R2",
+    "interface": "Serial0/1/1",
+    "old_oper_state": "up",
+    "new_oper_state": "lower-layer-down",
+    "old_admin_state": "up",
+    "new_admin_state": "up"
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-28T06:59:39.353912+00:00",
+      "detected": false,
+      "issue_type": "unknown",
+      "device": "R2",
+      "interface": "Serial0/1/1",
+      "root_causes_ranked": [],
+      "needs_fix": true,
+      "missing_info": [
+        "Provide the exact timestamp(s) of the alerted state changes for: R2 Serial0/1/1 (up -> lower-layer-down) and R3 Serial0/1/1 (up -> down/admin down), and the alert source/system that reported them.",
+        "Provide recent interface operational history and logs (syslog, SNMP traps or interface event records) around those timestamps for R2 Serial0/1/1 and R3 Serial0/1/1 (examples: output of 'show interfaces Serial0/1/1', 'show logging | include Serial0/1/1', or the provider circuit alarm logs).",
+        "Provide configuration-change/audit records covering the time window (who/when) and the current running-config snippet for interface Serial0/1/1 on R2 and R3 to confirm if 'shutdown' was applied/removed on R3.",
+        "Confirm whether any scheduled maintenance or provider/carrier activities were taking place on the serial links at the alert time, and whether the alert was a single occurrence or repeated/flapping events."
+      ]
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-28T06:59:58.745861+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "R2 Serial0/1/1 went from oper=up to oper=lower-layer-down while admin remains up; R3 Serial0/1/1 went from oper=up to oper=down and is administratively down. Impact: loss of serial link between R2 and R3. Desired outcome: restore the serial link (oper up) by reconciling administrative state.",
+      "needs_fix": true,
+      "problem": "Serial link between R2 and R3 is down: R2 Serial0/1/1 oper=lower-layer-down (admin up); R3 Serial0/1/1 oper=down (admin down). Likely cause: R3 interface is administratively shut.",
+      "fix_summary": "Remove administrative shutdown on R3 Serial0/1/1 (set admin up) to restore the link. If link does not return to oper up, perform further diagnostics (log review, provider circuit checks).",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router3",
+          "action": "set_interface_admin_state",
+          "target": "Serial0/1/1",
+          "parameters": [
+            "admin_state=up"
+          ]
+        }
+      ],
+      "step_count": 1
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-28T07:00:09.794012+00:00",
+      "changes": [
+        {
+          "tool": "set_interface_state",
+          "args": {
+            "router_name": "router3",
+            "interface_name": "Serial0/1/1",
+            "state": "up"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 28.5,
+      "diagnose_s": 12.6,
+      "remediate_s": 10.6,
+      "verify_s": 39.9,
+      "total_s": 212.1
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 1,
+      "collect_changes": 1,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 15,
+      "tool_calls_pre_diagnosis": 9,
+      "tool_calls_remediation": 1,
+      "tool_calls_verify": 5,
+      "remediation_attempts": 1,
+      "plan_steps": 1,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 1
+    },
+    "tokens": {
+      "total_prompt_tokens": 49389,
+      "total_completion_tokens": 15851,
+      "total_tokens": 65240
+    }
+  }
+}
