@@ -1,0 +1,211 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_missing_route_01",
+    "started_at": "2026-05-28T14:28:27.152412+00:00",
+    "ended_at": "2026-05-28T14:35:34.719330+00:00"
+  },
+  "input_alert": {
+    "alert_type": "network_reachability",
+    "source_network": "192.168.0.12",
+    "destination_ip": "172.16.0.12",
+    "pings_sent": 25,
+    "pings_successful": 0
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-28T14:30:16.065098+00:00",
+      "detected": true,
+      "issue_type": "routing_missing_return_route",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "routing_missing_return_route",
+          "cause": "r2_does_not_have_a_route_for_the_source_network_192_168_0_0_24_so_replies_for_traffic_sourced_from_192_168_0_12_are_forwarded_to_r2_s_default_next_hop_r3_instead_of_back_to_r1_this_prevents_icmp_replies_from_reaching_the_source_and_explains_0_25_pings_succeeding",
+          "confidence": 0.9,
+          "evidence": [
+            "R2 routing config shows only a default route: { \"prefix\": \"0.0.0.0\", \"mask\": \"0.0.0.0\", \"fwd-list\": [ { \"fwd\": \"10.0.0.6\" } ] }",
+            "R1 has an explicit route for the destination network pointing at R2: { \"prefix\": \"172.16.0.0\", \"mask\": \"255.255.255.0\", \"fwd-list\": [ { \"fwd\": \"10.0.0.2\" } ] }",
+            "Interface addresses confirming source/destination placement: R1 GigabitEthernet0/0/0 = 192.168.0.1/24; R2 GigabitEthernet0/0/0 = 172.16.0.1/24"
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    },
+    {
+      "ts": "2026-05-28T14:34:27.035420+00:00",
+      "detected": true,
+      "issue_type": "missing_route",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "missing_route",
+          "cause": "r2_has_no_route_for_the_192_168_0_0_24_source_network_so_it_cannot_forward_icmp_replies_back_to_192_168_0_12_via_r1",
+          "confidence": 0.95,
+          "evidence": [
+            "R2 routing: \"ip-route-interface-forwarding-list\": [ { \"prefix\": \"0.0.0.0\", \"mask\": \"0.0.0.0\", \"fwd-list\": [ { \"fwd\": \"10.0.0.6\" } ] } ]  (no 192.168.0.0/24 route present)",
+            "R1 interface: \"GigabitEthernet0/0/0 has IP 192.168.0.1/24\"",
+            "R2 interface: \"GigabitEthernet0/0/0 has IP 172.16.0.1/24\""
+          ]
+        },
+        {
+          "type": "wrong_egress_path_due_to_default_route",
+          "cause": "because_r2_lacks_a_specific_route_to_192_168_0_0_24_r2_uses_its_default_next_hop_10_0_0_6_r3_to_reach_that_destination_sending_replies_away_from_r1_instead_of_back_toward_the_192_168_0_0_24_network",
+          "confidence": 0.9,
+          "evidence": [
+            "R2 routing default: \"prefix\": \"0.0.0.0\", \"fwd\": \"10.0.0.6\"",
+            "R3 routing default: \"prefix\": \"0.0.0.0\", \"fwd-list\": [ { \"fwd\": \"Loopback1\" } ]  (indicates traffic from R2 will be forwarded toward R3/Loopback rather than to R1)",
+            "Topology: R1 <-> R2 link addresses 10.0.0.1/30 and 10.0.0.2/30 (path between R1 and R2 exists but R2 will not use it for 192.168.0.0/24 without a route)"
+          ]
+        },
+        {
+          "type": "remediation_failure",
+          "cause": "an_earlier_attempt_to_add_a_static_route_to_r2_for_192_168_0_0_24_failed_so_the_missing_route_remains",
+          "confidence": 0.9,
+          "evidence": [
+            "previous_changes add_static_route result: \"status\": \"error\", \"message\": \"Client error '400 Bad Request' ...\" for adding route on router2 for network 192.168.0.0"
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-28T14:30:39.193108+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "R2 lacks a return route for source network 192.168.0.0/24, causing 0/25 pings from 192.168.0.12 to 172.16.0.12 to fail; after remediation ICMP replies should return to 192.168.0.12 and pings should succeed.",
+      "needs_fix": true,
+      "problem": "R2 has only a default route and no route for 192.168.0.0/24, so replies from 172.16.0.12 are not forwarded back to 192.168.0.12.",
+      "fix_summary": "Add a static route on R2 for 192.168.0.0/24 pointing to next-hop 10.0.0.2 (R1) to restore the return path. Risk: brief routing change on R2; verify next-hop reachability.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "add_static_route",
+          "target": "192.168.0.0/24",
+          "parameters": [
+            "prefix=192.168.0.0",
+            "mask=255.255.255.0",
+            "next_hop=10.0.0.2",
+            "description=route-to-R1-192.168.0.0/24"
+          ]
+        }
+      ],
+      "step_count": 1
+    },
+    {
+      "ts": "2026-05-28T14:34:43.239325+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "R2 lacks a return route for source network 192.168.0.0/24, causing 0/25 pings from 192.168.0.12 to 172.16.0.12 to fail; after remediation ICMP replies should return to 192.168.0.12 and pings should succeed.",
+      "needs_fix": true,
+      "problem": "R2 has no route for 192.168.0.0/24 so ICMP replies are sent via default next-hop (10.0.0.6) instead of back to R1; previous attempt to add route on router2 failed.",
+      "fix_summary": "Add a static route on router2 for 192.168.0.0/24 with next-hop set to R1's IP (10.0.0.1) so replies to 192.168.0.0/24 are forwarded to R1.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "add_static_route",
+          "target": "router2",
+          "parameters": [
+            "network=192.168.0.0",
+            "mask=255.255.255.0",
+            "next_hop=10.0.0.1"
+          ]
+        }
+      ],
+      "step_count": 1
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {
+        "ping_10_0_0_2_success": true
+      },
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-28T14:30:52.478349+00:00",
+      "changes": [
+        {
+          "tool": "add_static_route",
+          "args": {
+            "router_name": "router2",
+            "network": "192.168.0.0",
+            "mask": "255.255.255.0",
+            "next_hop": "10.0.0.2"
+          },
+          "result": "error"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    },
+    {
+      "ts": "2026-05-28T14:34:52.722746+00:00",
+      "changes": [
+        {
+          "tool": "add_static_route",
+          "args": {
+            "router_name": "router2",
+            "network": "192.168.0.0",
+            "mask": "255.255.255.0",
+            "next_hop": "10.0.0.1"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 2,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 63.8,
+      "diagnose_s": 60.4,
+      "remediate_s": 21.0,
+      "verify_s": 65.4,
+      "total_s": 427.6
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 4,
+      "get_info": 2,
+      "format_network": 2,
+      "diagnose": 2,
+      "remediation": 2,
+      "collect_changes": 2,
+      "verify": 2,
+      "assess_verify": 2,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 11,
+      "tool_calls_pre_diagnosis": 6,
+      "tool_calls_remediation": 2,
+      "tool_calls_verify": 3,
+      "remediation_attempts": 2,
+      "plan_steps": 1,
+      "diagnoses_created": 2,
+      "plans_created": 2,
+      "execution_updates": 2
+    },
+    "tokens": {
+      "total_prompt_tokens": 74287,
+      "total_completion_tokens": 27516,
+      "total_tokens": 101803
+    }
+  }
+}

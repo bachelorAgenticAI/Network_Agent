@@ -1,0 +1,136 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_missing_incorrect_return_route_01",
+    "started_at": "2026-05-28T14:42:29.100981+00:00",
+    "ended_at": "2026-05-28T14:46:51.573054+00:00"
+  },
+  "input_alert": {
+    "alert_type": "network_reachability",
+    "source_network": "192.168.0.12",
+    "destination_ip": "172.16.0.12",
+    "pings_sent": 25,
+    "pings_successful": 0
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-28T14:45:15.211835+00:00",
+      "detected": true,
+      "issue_type": "missing_incorrect_return_route",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "missing_incorrect_return_route",
+          "cause": "r2_has_no_route_to_the_source_network_192_168_0_0_24_so_return_traffic_from_172_16_0_12_is_not_being_sent_back_to_r1_192_168_0_12",
+          "confidence": 0.9,
+          "evidence": [
+            "R2 routing: only a 0.0.0.0/0 route present (fwd -> 10.0.0.6). (get_running_config for R2 -> routing.ip-route-interface-forwarding-list shows only prefix 0.0.0.0 fwd 10.0.0.6)",
+            "R1 LAN network: GigabitEthernet0/0/0 address 192.168.0.1/24 (source's subnet). (get_running_config for R1 -> interfaces.GigabitEthernet 0/0/0 address 192.168.0.1/255.255.255.0)",
+            "R1 has a route to 172.16.0.0/24 via 10.0.0.2 (so R1->R2 path exists), but R2 lacks a reciprocal route for 192.168.0.0/24."
+          ]
+        },
+        {
+          "type": "asymmetric_misrouted_return_path_default_route",
+          "cause": "because_r2_lacks_a_specific_route_to_192_168_0_0_24_its_default_route_sends_unknown_destination_traffic_to_r3_10_0_0_6_replies_from_172_16_0_12_are_therefore_routed_toward_r3_instead_of_back_to_r1_causing_the_ping_failure",
+          "confidence": 0.8,
+          "evidence": [
+            "R2 default route: 0.0.0.0/0 fwd 10.0.0.6. (get_running_config for R2 -> routing.ip-route-interface-forwarding-list entry fwd-list fwd = 10.0.0.6)",
+            "R3 Serial0/1/1 address is 10.0.0.6 (get_running_config for R3 -> Serial 0/1/1 primary address 10.0.0.6), so R2's default forwards toward R3 rather than R1.",
+            "R1's route to 172.16.0.0 uses next-hop 10.0.0.2 (R2). (get_running_config for R1 -> routing entry prefix 172.16.0.0 fwd-list fwd = 10.0.0.2) — traffic is forwarded toward R2 but replies follow R2's default to R3."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-28T14:46:00.092561+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "R2 lacks a route to 192.168.0.0/24 so replies from 172.16.0.12 are forwarded via R2's default to R3 instead of back to R1; restore symmetric routing so source 192.168.0.12 can reach 172.16.0.12.",
+      "needs_fix": true,
+      "problem": "R2 has no route to 192.168.0.0/24; return traffic to 192.168.0.12 is sent to R3 via default route instead of R1.",
+      "fix_summary": "Add a static route on router2 for 192.168.0.0/24 pointing to R1 so return traffic is delivered to the source network.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "add_static_route",
+          "target": "192.168.0.0/24",
+          "parameters": [
+            "next-hop 10.0.0.1"
+          ]
+        }
+      ],
+      "step_count": 1
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-28T14:46:08.635845+00:00",
+      "changes": [
+        {
+          "tool": "add_static_route",
+          "args": {
+            "router_name": "router2",
+            "network": "192.168.0.0",
+            "mask": "255.255.255.0",
+            "next_hop": "10.0.0.1"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 56.6,
+      "diagnose_s": 64.4,
+      "remediate_s": 7.7,
+      "verify_s": 34.0,
+      "total_s": 262.5
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 1,
+      "collect_changes": 1,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 5,
+      "tool_calls_pre_diagnosis": 3,
+      "tool_calls_remediation": 1,
+      "tool_calls_verify": 1,
+      "remediation_attempts": 1,
+      "plan_steps": 1,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 1
+    },
+    "tokens": {
+      "total_prompt_tokens": 31050,
+      "total_completion_tokens": 13075,
+      "total_tokens": 44125
+    }
+  }
+}

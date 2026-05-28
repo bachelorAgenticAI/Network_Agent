@@ -1,0 +1,134 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_routing_missing_return_route_asymmetric_path_01",
+    "started_at": "2026-05-28T14:03:26.783440+00:00",
+    "ended_at": "2026-05-28T14:07:43.431940+00:00"
+  },
+  "input_alert": {
+    "alert_type": "network_reachability",
+    "source_network": "192.168.0.12",
+    "destination_ip": "172.16.0.12",
+    "pings_sent": 25,
+    "pings_successful": 0
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-28T14:06:05.772701+00:00",
+      "detected": true,
+      "issue_type": "routing_missing_return_route_asymmetric_path",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "routing_missing_return_route_asymmetric_path",
+          "cause": "r2_has_no_route_to_the_192_168_0_0_24_network_so_replies_from_172_16_0_12_are_not_being_sent_back_to_r1_192_168_0_12_they_will_follow_r2_s_default_to_r3_instead_this_produces_an_asymmetric_one_way_failure_r1_r2_forwards_the_ping_to_the_destination_but_r2_cannot_reach_the_source_network_to_deliver_replies",
+          "confidence": 0.9,
+          "evidence": [
+            "Alert: source 192.168.0.12 -> dest 172.16.0.12: 25 pings sent, 0 successful.",
+            "R1 routing: static for 172.16.0.0/24 via 10.0.0.2 (R1 will forward traffic for 172.16.0.0 to R2).",
+            "R1 GigabitEthernet0/0/0 = 192.168.0.1/24 (source LAN on R1).",
+            "R2 GigabitEthernet0/0/0 = 172.16.0.1/24 (destination LAN on R2).",
+            "R2 routing: only 0.0.0.0/0 with fwd 10.0.0.6 (no route for 192.168.0.0/24 present in R2's routing configuration)."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-28T14:06:37.255057+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "R2 has no route to 192.168.0.0/24 causing asymmetric/one-way failure: pings from 192.168.0.12 to 172.16.0.12 get no replies. Desired outcome: add route so replies are returned and reachability is restored.",
+      "needs_fix": true,
+      "problem": "R2 missing route to 192.168.0.0/24; replies from 172.16.0.12 are not forwarded back to 192.168.0.12 (one-way/ asymmetric reachability).",
+      "fix_summary": "Add a static route on router2 for 192.168.0.0/24 with next-hop toward router1 so return traffic reaches the source LAN.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "add_static_route",
+          "target": "192.168.0.0/24",
+          "parameters": [
+            "next-hop=10.0.0.1",
+            "assumption: router1 reachable at 10.0.0.1 on inter-router link; update next-hop if different",
+            "operational-risk: if next-hop is unreachable, traffic for 192.168.0.0/24 may be dropped"
+          ]
+        }
+      ],
+      "step_count": 1
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": [
+        "High ICMP latency/jitter observed (min/avg/max = 3/383/1906 ms) — may warrant further performance investigation.",
+        "Serial0/1/0 shows 7 input_errors — investigate physical/link quality if persistent.",
+        "Access-list R2_TO_R1 contains an explicit deny for TCP from 172.16.0.0/24 to 192.168.0.0/24 dst-port 443 — this will block HTTPS between those subnets unless intentional."
+      ]
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-28T14:06:53.404628+00:00",
+      "changes": [
+        {
+          "tool": "add_static_route",
+          "args": {
+            "router_name": "router2",
+            "network": "192.168.0.0",
+            "mask": "255.255.255.0",
+            "next_hop": "10.0.0.1"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 45.0,
+      "diagnose_s": 60.8,
+      "remediate_s": 15.3,
+      "verify_s": 39.9,
+      "total_s": 256.6
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 1,
+      "collect_changes": 1,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 7,
+      "tool_calls_pre_diagnosis": 3,
+      "tool_calls_remediation": 1,
+      "tool_calls_verify": 3,
+      "remediation_attempts": 1,
+      "plan_steps": 1,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 1
+    },
+    "tokens": {
+      "total_prompt_tokens": 34727,
+      "total_completion_tokens": 14032,
+      "total_tokens": 48759
+    }
+  }
+}

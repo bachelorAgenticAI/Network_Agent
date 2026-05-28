@@ -1,0 +1,130 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_missing_return_route_asymmetric_routing_01",
+    "started_at": "2026-05-28T13:40:49.381408+00:00",
+    "ended_at": "2026-05-28T13:44:25.838888+00:00"
+  },
+  "input_alert": {
+    "alert_type": "network_reachability",
+    "source_network": "192.168.0.12",
+    "destination_ip": "172.16.0.12",
+    "pings_sent": 25,
+    "pings_successful": 0
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-28T13:42:51.124585+00:00",
+      "detected": true,
+      "issue_type": "missing_return_route_asymmetric_routing",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "missing_return_route_asymmetric_routing",
+          "cause": "r2_has_no_route_for_the_192_168_0_0_24_network_so_icmp_replies_from_172_16_0_12_to_192_168_0_12_are_not_being_sent_back_via_r1_instead_r2_would_use_its_default_route_toward_r3_or_drop_the_traffic_resulting_in_0_25_pings",
+          "confidence": 0.9,
+          "evidence": [
+            "R1 has LAN 192.168.0.1/24 (GigabitEthernet0/0) and static route for 172.16.0.0/24 via 10.0.0.2 (R1 routing entry: 'prefix': '172.16.0.0' fwd-list '10.0.0.2').",
+            "R2 has LAN 172.16.0.1/24 (GigabitEthernet0/0) but its routing config shows only a default route ('prefix': '0.0.0.0' fwd-list '10.0.0.6') and no route to 192.168.0.0/24.",
+            "R1-R2 serial interface addresses are 10.0.0.1 (R1 Serial0/1/0) and 10.0.0.2 (R2 Serial0/1/0) — path exists, but R2 lacks an appropriate route back to the source network.",
+            "ACLs on R1 and R2 (R1_TO_R2 and R2_TO_R1) only deny specific TCP ports then permit ip (e.g. R1 denies tcp dst port 80 then 'permit ip any any'; R2 denies tcp dst port 443 then 'permit ip any any'), so they do not explain ICMP being blocked."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-28T13:43:14.696914+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "Restore IP reachability so 172.16.0.12 can reply to 192.168.0.12 (0/25 pings) by correcting asymmetric/missing return route on R2.",
+      "needs_fix": true,
+      "problem": "R2 has no route for 192.168.0.0/24, causing ICMP replies from 172.16.0.12 to be dropped or forwarded incorrectly (0/25 pings).",
+      "fix_summary": "Add a static route on R2 for 192.168.0.0/24 via next-hop 10.0.0.1 (R1 Serial0/1/0).",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "add_static_route",
+          "target": "192.168.0.0/24",
+          "parameters": [
+            "next_hop=10.0.0.1",
+            "next_hop_interface=Serial0/1/0",
+            "metric=1",
+            "description=Route_to_192.168.0.0/24_via_R1"
+          ]
+        }
+      ],
+      "step_count": 1
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": []
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-28T13:43:21.032790+00:00",
+      "changes": [
+        {
+          "tool": "add_static_route",
+          "args": {
+            "router_name": "router2",
+            "network": "192.168.0.0",
+            "mask": "255.255.255.0",
+            "next_hop": "10.0.0.1"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 32.8,
+      "diagnose_s": 33.6,
+      "remediate_s": 5.5,
+      "verify_s": 54.6,
+      "total_s": 216.5
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 1,
+      "collect_changes": 1,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 5,
+      "tool_calls_pre_diagnosis": 3,
+      "tool_calls_remediation": 1,
+      "tool_calls_verify": 1,
+      "remediation_attempts": 1,
+      "plan_steps": 1,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 1
+    },
+    "tokens": {
+      "total_prompt_tokens": 35795,
+      "total_completion_tokens": 12615,
+      "total_tokens": 48410
+    }
+  }
+}

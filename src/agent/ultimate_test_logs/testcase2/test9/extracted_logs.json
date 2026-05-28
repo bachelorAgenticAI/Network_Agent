@@ -1,0 +1,137 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_missing_return_route_on_r2_01",
+    "started_at": "2026-05-28T14:48:30.138820+00:00",
+    "ended_at": "2026-05-28T14:51:56.586819+00:00"
+  },
+  "input_alert": {
+    "alert_type": "network_reachability",
+    "source_network": "192.168.0.12",
+    "destination_ip": "172.16.0.12",
+    "pings_sent": 25,
+    "pings_successful": 0
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-28T14:50:36.587942+00:00",
+      "detected": true,
+      "issue_type": "missing_return_route_on_r2",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "missing_return_route_on_r2",
+          "cause": "r2_has_no_route_for_the_192_168_0_0_24_network_so_return_traffic_from_172_16_0_12_to_192_168_0_12_is_unroutable_r1_r2_path_exists_but_r2_cannot_send_replies_back",
+          "confidence": 0.9,
+          "evidence": [
+            "R1 routing: has route for 172.16.0.0/24 via next-hop 10.0.0.2 (R1 routing.ip-route-interface-forwarding-list entry: {\"prefix\": \"172.16.0.0\", \"fwd-list\": [{\"fwd\": \"10.0.0.2\"}]}).",
+            "R1 Serial0/1/0 IP: 10.0.0.1/30 (connected to R2).",
+            "R2 Serial0/1/0 IP: 10.0.0.2/30 (connected to R1).",
+            "R2 routing: no specific route for 192.168.0.0/24 — routing.ip-route-interface-forwarding-list contains only a default route ({\"prefix\": \"0.0.0.0\", \"fwd-list\": [{\"fwd\": \"10.0.0.6\"}]}) and no entry for 192.168.0.0/24."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": [
+        "Provide R2's full active routing table (show ip route) to confirm absence of 192.168.0.0/24 and to see current next-hops.",
+        "Confirm that host 172.16.0.12 is up and has correct default gateway (172.16.0.1) / provide R2's ARP table entry for 172.16.0.12."
+      ]
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-28T14:50:54.854224+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "R2 has no route to 192.168.0.0/24, so return traffic from 172.16.0.12 cannot reach 192.168.0.12. Restore bidirectional reachability by adding a return route on R2 for 192.168.0.0/24 pointing to R1.",
+      "needs_fix": true,
+      "problem": "R2 missing route for 192.168.0.0/24; return traffic from 172.16.0.12 to 192.168.0.12 is unroutable.",
+      "fix_summary": "Add a static route on router2 for 192.168.0.0/24 via next-hop 10.0.0.1 (R1) using Serial0/1/0.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "add_static_route",
+          "target": "192.168.0.0/24",
+          "parameters": [
+            "next-hop=10.0.0.1",
+            "outgoing-interface=Serial0/1/0",
+            "description=Return route to 192.168.0.0/24 via R1"
+          ]
+        }
+      ],
+      "step_count": 1
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {
+        "ping_10_0_0_2_success": true
+      },
+      "remaining_issues": [
+        "Access-list R2_TO_R1 on R2 includes an explicit deny for tcp from 172.16.0.0/24 to 192.168.0.0/24 dst-port 443; this may block HTTPS traffic between the LANs and should be validated as intentional.",
+        "End-to-end host verification (e.g., ping/traceroute or an application test from 172.16.0.12 to 192.168.0.12) has not been shown — recommend one host-to-host test to confirm full connectivity."
+      ]
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-28T14:51:06.075442+00:00",
+      "changes": [
+        {
+          "tool": "add_static_route",
+          "args": {
+            "router_name": "router2",
+            "network": "192.168.0.0",
+            "mask": "255.255.255.0",
+            "next_hop": "10.0.0.1"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 28.4,
+      "diagnose_s": 31.8,
+      "remediate_s": 10.4,
+      "verify_s": 37.4,
+      "total_s": 206.4
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 1,
+      "collect_changes": 1,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 12,
+      "tool_calls_pre_diagnosis": 9,
+      "tool_calls_remediation": 1,
+      "tool_calls_verify": 2,
+      "remediation_attempts": 1,
+      "plan_steps": 1,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 1
+    },
+    "tokens": {
+      "total_prompt_tokens": 40471,
+      "total_completion_tokens": 12662,
+      "total_tokens": 53133
+    }
+  }
+}

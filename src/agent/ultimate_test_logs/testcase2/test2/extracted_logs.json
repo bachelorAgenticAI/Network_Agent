@@ -1,0 +1,139 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_missing_return_route_asymmetric_routing_01",
+    "started_at": "2026-05-28T13:52:21.736694+00:00",
+    "ended_at": "2026-05-28T13:56:23.456794+00:00"
+  },
+  "input_alert": {
+    "alert_type": "network_reachability",
+    "source_network": "192.168.0.12",
+    "destination_ip": "172.16.0.12",
+    "pings_sent": 25,
+    "pings_successful": 0
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-28T13:54:22.607587+00:00",
+      "detected": true,
+      "issue_type": "missing_return_route_asymmetric_routing",
+      "device": null,
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "missing_return_route_asymmetric_routing",
+          "cause": "r2_has_no_route_for_the_192_168_0_0_24_network_so_replies_from_172_16_0_12_have_no_known_next_hop_back_to_192_168_0_12",
+          "confidence": 0.9,
+          "evidence": [
+            "R1 routing: static route for 172.16.0.0/24 -> next-hop 10.0.0.2 (R2) (\"\\\"prefix\\\": \\\"172.16.0.0\\\", \\\"fwd-list\\\": [ { \\\"fwd\\\": \\\"10.0.0.2\\\" } ]\\\")",
+            "R2 routing: only a default route present -> next-hop 10.0.0.6; no route for 192.168.0.0/24 found (\"\\\"prefix\\\": \\\"0.0.0.0\\\", \\\"fwd-list\\\": [ { \\\"fwd\\\": \\\"10.0.0.6\\\" } ]\\\")",
+            "R1 LAN: 192.168.0.1/24 and R2 LAN: 172.16.0.1/24 are on different routers, requiring routing for return path (R1 Gi0/0/0 address 192.168.0.1; R2 Gi0/0/0 address 172.16.0.1)."
+          ]
+        },
+        {
+          "type": "no_dynamic_routing_configured",
+          "cause": "there_is_no_routing_protocol_exchanging_reachability_between_routers_ospf_empty_on_all_devices_so_static_routes_must_be_configured_on_each_router_the_missing_static_route_on_r2_therefore_prevents_bidirectional_reachability",
+          "confidence": 0.8,
+          "evidence": [
+            "get_ospf output for R1/R2/R3: \"{ \\\"ospf_full\\\": [] }\" (OSPF not running / no learned routes)",
+            "R1 contains a static route to 172.16.0.0/24, indicating static route usage rather than dynamic exchange (R1 routing entry for 172.16.0.0 -> 10.0.0.2)."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-28T13:54:46.955178+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "Source 192.168.0.12 cannot reach 172.16.0.12 (0/25 pings) because R2 has no return route for 192.168.0.0/24; goal is to restore bidirectional reachability so replies from 172.16.0.12 return to 192.168.0.12.",
+      "needs_fix": true,
+      "problem": "R2 missing route for 192.168.0.0/24 causing asymmetric routing and packet loss.",
+      "fix_summary": "Add a static route on R2 pointing 192.168.0.0/24 via the R1-facing next-hop (10.0.0.1) to restore return path.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router2",
+          "action": "add_static_route",
+          "target": "192.168.0.0/24",
+          "parameters": [
+            "next-hop=10.0.0.1",
+            "description=Return route to R1 LAN 192.168.0.0/24"
+          ]
+        }
+      ],
+      "step_count": 1
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": true,
+      "evidence": {},
+      "remaining_issues": [
+        "R2 access-list R2_TO_R1 contains an explicit deny for tcp from 172.16.0.0/24 to 192.168.0.0/24 dst-port 443 which may block HTTPS between the LANs: see access-list sequence 10 in R2 running-config.",
+        "No dynamic routing (OSPF) is configured on the routers (ospf outputs empty); consider configuring a routing protocol for automatic route distribution instead of relying on static routes."
+      ]
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-28T13:54:56.289537+00:00",
+      "changes": [
+        {
+          "tool": "add_static_route",
+          "args": {
+            "router_name": "router2",
+            "network": "192.168.0.0",
+            "mask": "255.255.255.0",
+            "next_hop": "10.0.0.1"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 32.4,
+      "diagnose_s": 24.0,
+      "remediate_s": 8.5,
+      "verify_s": 78.3,
+      "total_s": 241.7
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 2,
+      "get_info": 1,
+      "format_network": 1,
+      "diagnose": 1,
+      "remediation": 1,
+      "collect_changes": 1,
+      "verify": 1,
+      "assess_verify": 1,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 11,
+      "tool_calls_pre_diagnosis": 9,
+      "tool_calls_remediation": 1,
+      "tool_calls_verify": 1,
+      "remediation_attempts": 1,
+      "plan_steps": 1,
+      "diagnoses_created": 1,
+      "plans_created": 1,
+      "execution_updates": 1
+    },
+    "tokens": {
+      "total_prompt_tokens": 40578,
+      "total_completion_tokens": 13726,
+      "total_tokens": 54304
+    }
+  }
+}
