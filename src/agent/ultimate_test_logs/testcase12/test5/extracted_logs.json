@@ -1,0 +1,490 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_configuration_missing_01",
+    "started_at": "2026-05-28T10:24:37.683707+00:00",
+    "ended_at": "2026-05-28T10:35:28.562985+00:00"
+  },
+  "input_alert": {
+    "alert_type": "BGP_Routing",
+    "device": "R3",
+    "protocol": "BGP",
+    "status": "down"
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-28T10:26:17.059552+00:00",
+      "detected": true,
+      "issue_type": "configuration_bgp_missing_on_r3",
+      "device": "R3",
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "configuration_bgp_missing_on_r3",
+          "cause": "no_bgp_process_configured_on_r3_so_a_bgp_session_cannot_be_established",
+          "confidence": 0.95,
+          "evidence": [
+            "get_running_config for R3 contains an 'ospf' section (router-id 3.3.3.3) and OSPF network statements but contains no 'bgp' or 'router bgp' stanza.",
+            "R3 running-config shows interfaces and Loopback1 but no BGP neighbor or autonomous-system configuration blocks."
+          ]
+        },
+        {
+          "type": "configuration_bgp_missing_on_peer_routers",
+          "cause": "peer_routers_r1_and_r2_also_have_no_bgp_configured_so_even_if_r3_had_bgp_configured_there_are_no_configured_neighbors_to_form_a_session_with",
+          "confidence": 0.9,
+          "evidence": [
+            "get_running_config for R1 contains 'ospf' process-id 1 and 'routing': null; there is no 'bgp'/'router bgp' stanza in R1 config.",
+            "get_running_config for R2 contains 'ospf' process-id 1 and 'routing': null; there is no 'bgp'/'router bgp' stanza in R2 config."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    },
+    {
+      "ts": "2026-05-28T10:31:00.185531+00:00",
+      "detected": true,
+      "issue_type": "configuration_missing",
+      "device": "R3",
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "configuration_missing",
+          "cause": "r1_has_no_bgp_configuration",
+          "confidence": 0.9,
+          "evidence": [
+            "R1 running-config shows \"routing\": null and only OSPF under routing (ospf process-id 1, router-id 1.1.1.1) — no bgp section present (get_running_config for R1).",
+            "Recent fetch for R1 completed successfully (last_seen_ts: 2026-05-28T12:34:56Z), confirming current config lacks BGP."
+          ]
+        },
+        {
+          "type": "configuration_missing",
+          "cause": "r2_has_no_bgp_configuration",
+          "confidence": 0.9,
+          "evidence": [
+            "R2 running-config shows \"routing\": null and only OSPF under routing (ospf process-id 1, router-id 2.2.2.2) — no bgp section present (get_running_config for R2).",
+            "Recent fetch for R2 completed successfully (last_seen_ts: 2026-05-28T12:34:56Z), confirming current config lacks BGP."
+          ]
+        },
+        {
+          "type": "device_unreachable_or_unverified",
+          "cause": "r3_bgp_configuration_cannot_be_verified_running_config_fetch_failed_device_marked_stale_therefore_it_is_unknown_whether_bgp_is_present_on_r3",
+          "confidence": 0.6,
+          "evidence": [
+            "Attempt to fetch R3 running-config failed (recent_changes: \"failed to fetch running-config for R3\", tool_call_id: call_D2kmjQITzQZgjtRQr30NBVx8).",
+            "get_running_config returned {\"error\": \"\"} for R3 and R3 device metadata shows \"stale\": \"true\" and last_seen_ts: 2026-05-28T12:00:00Z."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": [
+        "Provide the full running-config for R3 (current fetch failed) or restore connectivity so R3's configuration can be retrieved.",
+        "Confirm the BGP AS number to be used for the iBGP session among R1, R2, and R3 (not present in retrieved configs)."
+      ]
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-28T10:26:48.627664+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "BGP is not configured on R3 and peer routers R1 and R2; as a result BGP sessions are down and inter-router BGP adjacencies cannot form. Goal: configure BGP on R1, R2, and R3 to establish iBGP adjacencies and restore BGP routing.",
+      "needs_fix": true,
+      "problem": "No BGP process configured on R3, R1, or R2; BGP sessions cannot be established.",
+      "fix_summary": "Enable BGP on router1, router2, and router3 using AS 65000 and loopback-based iBGP neighbors (1.1.1.1, 2.2.2.2, 3.3.3.3) to form a full mesh.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router1",
+          "action": "configure_bgp",
+          "target": "AS 65000",
+          "parameters": [
+            "local_as=65000",
+            "router_id=1.1.1.1",
+            "loopback_interface=Loopback1:1.1.1.1/32",
+            "neighbors=2.2.2.2,3.3.3.3",
+            "neighbor_use_loopback=true",
+            "address_family=ipv4_unicast",
+            "establish_iBGP_full_mesh=true"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router2",
+          "action": "configure_bgp",
+          "target": "AS 65000",
+          "parameters": [
+            "local_as=65000",
+            "router_id=2.2.2.2",
+            "loopback_interface=Loopback1:2.2.2.2/32",
+            "neighbors=1.1.1.1,3.3.3.3",
+            "neighbor_use_loopback=true",
+            "address_family=ipv4_unicast",
+            "establish_iBGP_full_mesh=true"
+          ]
+        },
+        {
+          "id": 3,
+          "device": "router3",
+          "action": "configure_bgp",
+          "target": "AS 65000",
+          "parameters": [
+            "local_as=65000",
+            "router_id=3.3.3.3",
+            "loopback_interface=Loopback1:3.3.3.3/32",
+            "neighbors=1.1.1.1,2.2.2.2",
+            "neighbor_use_loopback=true",
+            "address_family=ipv4_unicast",
+            "establish_iBGP_full_mesh=true"
+          ]
+        }
+      ],
+      "step_count": 3
+    },
+    {
+      "ts": "2026-05-28T10:31:32.535368+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "BGP is not configured on R3 and peer routers R1 and R2; as a result BGP sessions are down and inter-router BGP adjacencies cannot form. Goal: configure BGP on R1, R2, and R3 to establish iBGP adjacencies and restore BGP routing.",
+      "needs_fix": true,
+      "problem": "R1 and R2 have no BGP configuration; R3's running-config could not be retrieved. iBGP sessions among R1, R2, R3 are down, preventing BGP route exchange.",
+      "fix_summary": "Create loopback on R1, instantiate BGP process (ASN 65000) on R1/R2/R3, and configure iBGP neighbors (full mesh using loopbacks 1.1.1.1, 2.2.2.2, 3.3.3.3). Assumed AS = 65000 and R1 loopback 1.1.1.1 because R3 config fetch failed; confirm AS if different.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router1",
+          "action": "configure_interface",
+          "target": "Loopback1",
+          "parameters": [
+            "ip=1.1.1.1",
+            "mask=255.255.255.255"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router1",
+          "action": "create_bgp_process",
+          "target": null,
+          "parameters": [
+            "asn=65000",
+            "router_id=1.1.1.1"
+          ]
+        },
+        {
+          "id": 3,
+          "device": "router2",
+          "action": "create_bgp_process",
+          "target": null,
+          "parameters": [
+            "asn=65000",
+            "router_id=2.2.2.2"
+          ]
+        },
+        {
+          "id": 4,
+          "device": "router3",
+          "action": "create_bgp_process",
+          "target": null,
+          "parameters": [
+            "asn=65000",
+            "router_id=3.3.3.3"
+          ]
+        },
+        {
+          "id": 5,
+          "device": "router1",
+          "action": "create_bgp_neighbor",
+          "target": "2.2.2.2",
+          "parameters": [
+            "remote_as=65000",
+            "update_source=Loopback1"
+          ]
+        },
+        {
+          "id": 6,
+          "device": "router1",
+          "action": "create_bgp_neighbor",
+          "target": "3.3.3.3",
+          "parameters": [
+            "remote_as=65000",
+            "update_source=Loopback1"
+          ]
+        },
+        {
+          "id": 7,
+          "device": "router2",
+          "action": "create_bgp_neighbor",
+          "target": "1.1.1.1",
+          "parameters": [
+            "remote_as=65000",
+            "update_source=Loopback1"
+          ]
+        },
+        {
+          "id": 8,
+          "device": "router2",
+          "action": "create_bgp_neighbor",
+          "target": "3.3.3.3",
+          "parameters": [
+            "remote_as=65000",
+            "update_source=Loopback1"
+          ]
+        },
+        {
+          "id": 9,
+          "device": "router3",
+          "action": "create_bgp_neighbor",
+          "target": "1.1.1.1",
+          "parameters": [
+            "remote_as=65000",
+            "update_source=Loopback1"
+          ]
+        },
+        {
+          "id": 10,
+          "device": "router3",
+          "action": "create_bgp_neighbor",
+          "target": "2.2.2.2",
+          "parameters": [
+            "remote_as=65000",
+            "update_source=Loopback1"
+          ]
+        }
+      ],
+      "step_count": 10
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": false,
+      "evidence": {},
+      "remaining_issues": [
+        "R1 has no BGP configuration (running-config shows routing: null).",
+        "R2 has no BGP configuration (running-config shows routing: null).",
+        "R3's running-config could not be retrieved / device marked stale — unknown whether BGP is configured on R3.",
+        "As a result, iBGP sessions among R1, R2, and R3 are not established and BGP route exchange is not occurring."
+      ]
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-28T10:27:12.549262+00:00",
+      "changes": [
+        {
+          "tool": "create_ospf_process",
+          "args": {
+            "router_name": "router1",
+            "process_id": 65000,
+            "router_id": "1.1.1.1"
+          },
+          "result": "error"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:27:38.881823+00:00",
+      "changes": [
+        {
+          "tool": "configure_interface",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "Loopback1",
+            "ip": "2.2.2.2",
+            "mask": "255.255.255.255"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 2,
+      "remediation_step_idx": 2,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:27:56.274261+00:00",
+      "changes": [
+        {
+          "tool": "configure_interface",
+          "args": {
+            "router_name": "router3",
+            "interface_name": "Loopback1",
+            "ip": "3.3.3.3",
+            "mask": "255.255.255.255"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 3,
+      "remediation_step_idx": 3,
+      "remediation_done": true
+    },
+    {
+      "ts": "2026-05-28T10:31:38.262001+00:00",
+      "changes": [
+        {
+          "tool": "configure_interface",
+          "args": {
+            "router_name": "router1",
+            "interface_name": "Loopback1",
+            "ip": "1.1.1.1",
+            "mask": "255.255.255.255"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 4,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:31:54.285533+00:00",
+      "changes": [],
+      "change_count": 0,
+      "total_change_count": 5,
+      "remediation_step_idx": 2,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:32:08.680718+00:00",
+      "changes": [
+        {
+          "tool": "create_ospf_process",
+          "args": {
+            "router_name": "router2",
+            "process_id": 65000,
+            "router_id": "2.2.2.2"
+          },
+          "result": "error"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 6,
+      "remediation_step_idx": 3,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:32:32.716537+00:00",
+      "changes": [
+        {
+          "tool": "create_ospf_process",
+          "args": {
+            "router_name": "router3",
+            "process_id": 65000,
+            "router_id": "3.3.3.3"
+          },
+          "result": "error"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 7,
+      "remediation_step_idx": 4,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:32:54.776086+00:00",
+      "changes": [
+        {
+          "tool": "get_running_config",
+          "args": {
+            "router_name": "router1"
+          },
+          "result": "unknown"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 8,
+      "remediation_step_idx": 5,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:33:16.700002+00:00",
+      "changes": [],
+      "change_count": 0,
+      "total_change_count": 9,
+      "remediation_step_idx": 6,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:33:29.846348+00:00",
+      "changes": [],
+      "change_count": 0,
+      "total_change_count": 10,
+      "remediation_step_idx": 7,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:33:44.553698+00:00",
+      "changes": [],
+      "change_count": 0,
+      "total_change_count": 11,
+      "remediation_step_idx": 8,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:34:15.960525+00:00",
+      "changes": [],
+      "change_count": 0,
+      "total_change_count": 12,
+      "remediation_step_idx": 9,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:34:39.353609+00:00",
+      "changes": [
+        {
+          "tool": "get_running_config",
+          "args": {
+            "router_name": "router3"
+          },
+          "result": "unknown"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 13,
+      "remediation_step_idx": 10,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 81.7,
+      "diagnose_s": 33.7,
+      "remediate_s": 213.4,
+      "verify_s": 76.3,
+      "total_s": 650.9
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 4,
+      "get_info": 2,
+      "format_network": 2,
+      "diagnose": 2,
+      "remediation": 13,
+      "collect_changes": 13,
+      "verify": 2,
+      "assess_verify": 2,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 25,
+      "tool_calls_pre_diagnosis": 6,
+      "tool_calls_remediation": 13,
+      "tool_calls_verify": 6,
+      "remediation_attempts": 13,
+      "plan_steps": 10,
+      "diagnoses_created": 2,
+      "plans_created": 2,
+      "execution_updates": 13
+    },
+    "tokens": {
+      "total_prompt_tokens": 152178,
+      "total_completion_tokens": 42574,
+      "total_tokens": 194752
+    }
+  }
+}

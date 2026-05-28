@@ -1,0 +1,555 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_configuration_missing_01",
+    "started_at": "2026-05-28T10:47:04.024188+00:00",
+    "ended_at": "2026-05-28T11:00:38.541766+00:00"
+  },
+  "input_alert": {
+    "alert_type": "BGP_Routing",
+    "device": "R3",
+    "protocol": "BGP",
+    "status": "down"
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-28T10:49:24.344918+00:00",
+      "detected": true,
+      "issue_type": "configuration_missing_bgp_process",
+      "device": "R3",
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "configuration_missing_bgp_process",
+          "cause": "no_bgp_neighbor_configuration_exists_on_r3_and_peers_so_a_bgp_session_cannot_be_established",
+          "confidence": 0.95,
+          "evidence": [
+            "R3 running-config contains an 'ospf' process (router-id 3.3.3.3) and loopback, but no 'router bgp' or any 'bgp' stanza is present (get_running_config:router3).",
+            "R1 and R2 running-configs likewise show OSPF configuration and do not contain any 'router bgp' or 'bgp' configuration (get_running_config:router1, get_running_config:router2).",
+            "Topology links show R3 has IP connectivity addresses (10.0.0.9/30 and 10.0.0.6/30) to R1/R2, but absence of BGP config on endpoints explains a BGP session being 'down'."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    },
+    {
+      "ts": "2026-05-28T10:55:59.555357+00:00",
+      "detected": true,
+      "issue_type": "configuration_missing",
+      "device": "R3",
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "configuration_missing",
+          "cause": "no_bgp_process_neighbor_configuration_present_on_r1_r2_and_r3_no_router_bgp_sections_exist_so_bgp_sessions_cannot_form",
+          "confidence": 0.95,
+          "evidence": [
+            "R1 running-config (get_running_config): \"routing\": null and OSPF configured (process-id 1, router-id \"1.1.1.1\") — no 'bgp'/'router bgp' block present (call id: lc_b38a2cc5-481a-4fc9-9055-f253de473579).",
+            "R2 running-config (get_running_config): \"routing\": null and OSPF configured (process-id 1, router-id \"2.2.2.2\") — no 'bgp'/'router bgp' block present (call id: lc_06742bf8-86bf-4ef9-b49d-e92c75e04b9a).",
+            "R3 running-config (get_running_config): OSPF configured (router-id \"3.3.3.3\"), loopback and serial interfaces present and routing/static default shown — no 'bgp'/'router bgp' block present in the returned config (call ids: lc_df29d12c-a8de-40bd-aa58-4971d3b9200e, lc_d10a701e-a8b2-4273-96da-caaab1773c23)."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-28T10:50:02.334643+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "BGP sessions are down because R3, R1, and R2 lack 'router bgp' configuration; create BGP processes and neighbor adjacencies so sessions come up and routes can be exchanged.",
+      "needs_fix": true,
+      "problem": "No BGP process or neighbor configuration on R1, R2, R3; BGP sessions cannot establish between R3 and its peers.",
+      "fix_summary": "Create a BGP process (AS 65000) on router1, router2, router3 and configure neighbor relationships between R3<->R1 and R3<->R2 using the directly-connected IPs (assumed peer IPs: R1=10.0.0.8, R3=10.0.0.9; R2=10.0.0.5, R3=10.0.0.6).",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router3",
+          "action": "create_bgp_process",
+          "target": null,
+          "parameters": [
+            "as 65000",
+            "router-id 3.3.3.3"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router1",
+          "action": "create_bgp_process",
+          "target": null,
+          "parameters": [
+            "as 65000",
+            "router-id 1.1.1.1"
+          ]
+        },
+        {
+          "id": 3,
+          "device": "router2",
+          "action": "create_bgp_process",
+          "target": null,
+          "parameters": [
+            "as 65000",
+            "router-id 2.2.2.2"
+          ]
+        },
+        {
+          "id": 4,
+          "device": "router3",
+          "action": "add_bgp_neighbor",
+          "target": null,
+          "parameters": [
+            "neighbor 10.0.0.8 remote-as 65000"
+          ]
+        },
+        {
+          "id": 5,
+          "device": "router3",
+          "action": "add_bgp_neighbor",
+          "target": null,
+          "parameters": [
+            "neighbor 10.0.0.5 remote-as 65000"
+          ]
+        },
+        {
+          "id": 6,
+          "device": "router1",
+          "action": "add_bgp_neighbor",
+          "target": null,
+          "parameters": [
+            "neighbor 10.0.0.9 remote-as 65000"
+          ]
+        },
+        {
+          "id": 7,
+          "device": "router2",
+          "action": "add_bgp_neighbor",
+          "target": null,
+          "parameters": [
+            "neighbor 10.0.0.6 remote-as 65000"
+          ]
+        }
+      ],
+      "step_count": 7
+    },
+    {
+      "ts": "2026-05-28T10:56:39.688082+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "BGP sessions are down because R3, R1, and R2 lack 'router bgp' configuration; create BGP processes and neighbor adjacencies so sessions come up and routes can be exchanged.",
+      "needs_fix": true,
+      "problem": "No 'router bgp' configuration on R1, R2, R3 — BGP sessions are down and routes are not being exchanged.",
+      "fix_summary": "Create a BGP process on each router and configure eBGP neighbor relationships on each serial link (R1-R2, R2-R3, R1-R3).",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router1",
+          "action": "create_bgp_process",
+          "target": null,
+          "parameters": [
+            "as=65001",
+            "router_id=1.1.1.1"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router2",
+          "action": "create_bgp_process",
+          "target": null,
+          "parameters": [
+            "as=65002",
+            "router_id=2.2.2.2"
+          ]
+        },
+        {
+          "id": 3,
+          "device": "router3",
+          "action": "create_bgp_process",
+          "target": null,
+          "parameters": [
+            "as=65003",
+            "router_id=3.3.3.3"
+          ]
+        },
+        {
+          "id": 4,
+          "device": "router1",
+          "action": "add_bgp_neighbor",
+          "target": "10.0.0.2",
+          "parameters": [
+            "remote_as=65002"
+          ]
+        },
+        {
+          "id": 5,
+          "device": "router1",
+          "action": "add_bgp_neighbor",
+          "target": "10.0.0.9",
+          "parameters": [
+            "remote_as=65003"
+          ]
+        },
+        {
+          "id": 6,
+          "device": "router2",
+          "action": "add_bgp_neighbor",
+          "target": "10.0.0.1",
+          "parameters": [
+            "remote_as=65001"
+          ]
+        },
+        {
+          "id": 7,
+          "device": "router2",
+          "action": "add_bgp_neighbor",
+          "target": "10.0.0.6",
+          "parameters": [
+            "remote_as=65003"
+          ]
+        },
+        {
+          "id": 8,
+          "device": "router3",
+          "action": "add_bgp_neighbor",
+          "target": "10.0.0.10",
+          "parameters": [
+            "remote_as=65001"
+          ]
+        },
+        {
+          "id": 9,
+          "device": "router3",
+          "action": "add_bgp_neighbor",
+          "target": "10.0.0.5",
+          "parameters": [
+            "remote_as=65002"
+          ]
+        }
+      ],
+      "step_count": 9
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": false,
+      "evidence": {},
+      "remaining_issues": [
+        "R1 has no 'router bgp' configuration — BGP process/neighbor statements missing.",
+        "R2 has no 'router bgp' configuration — BGP process/neighbor statements missing.",
+        "R3 has no 'router bgp' configuration — BGP process/neighbor statements missing."
+      ]
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-28T10:50:27.344773+00:00",
+      "changes": [
+        {
+          "tool": "get_running_config",
+          "args": {
+            "router_name": "router3"
+          },
+          "result": "unknown"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:50:47.853934+00:00",
+      "changes": [
+        {
+          "tool": "create_ospf_process",
+          "args": {
+            "router_name": "router1",
+            "process_id": 65000,
+            "router_id": "1.1.1.1"
+          },
+          "result": "error"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 2,
+      "remediation_step_idx": 2,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:51:07.784235+00:00",
+      "changes": [
+        {
+          "tool": "create_ospf_process",
+          "args": {
+            "router_name": "router2",
+            "process_id": 65000,
+            "router_id": "2.2.2.2"
+          },
+          "result": "error"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 3,
+      "remediation_step_idx": 3,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:51:37.972233+00:00",
+      "changes": [],
+      "change_count": 0,
+      "total_change_count": 4,
+      "remediation_step_idx": 4,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:52:08.448525+00:00",
+      "changes": [],
+      "change_count": 0,
+      "total_change_count": 5,
+      "remediation_step_idx": 5,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:52:30.914274+00:00",
+      "changes": [
+        {
+          "tool": "get_running_config",
+          "args": {
+            "router_name": "router1"
+          },
+          "result": "unknown"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 6,
+      "remediation_step_idx": 6,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:52:57.747181+00:00",
+      "changes": [
+        {
+          "tool": "add_standard_acl_rule",
+          "args": {
+            "router_name": "router2",
+            "acl_name": "TEMP_BGP_ADD",
+            "sequence": 10,
+            "action": "permit",
+            "network": "10.0.0.6",
+            "mask": "255.255.255.255"
+          },
+          "result": "error"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 7,
+      "remediation_step_idx": 7,
+      "remediation_done": true
+    },
+    {
+      "ts": "2026-05-28T10:56:57.588422+00:00",
+      "changes": [
+        {
+          "tool": "create_ospf_process",
+          "args": {
+            "router_name": "router1",
+            "process_id": 65001,
+            "router_id": "1.1.1.1"
+          },
+          "result": "error"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 8,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:57:17.772487+00:00",
+      "changes": [
+        {
+          "tool": "create_ospf_process",
+          "args": {
+            "router_name": "router2",
+            "process_id": 65002,
+            "router_id": "2.2.2.2"
+          },
+          "result": "error"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 9,
+      "remediation_step_idx": 2,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:57:34.616795+00:00",
+      "changes": [
+        {
+          "tool": "create_ospf_process",
+          "args": {
+            "router_name": "router3",
+            "process_id": 65003,
+            "router_id": "3.3.3.3"
+          },
+          "result": "error"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 10,
+      "remediation_step_idx": 3,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:57:59.212134+00:00",
+      "changes": [],
+      "change_count": 0,
+      "total_change_count": 11,
+      "remediation_step_idx": 4,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:58:20.692002+00:00",
+      "changes": [
+        {
+          "tool": "create_standard_acl",
+          "args": {
+            "router_name": "router1",
+            "acl_name": "TEMP_ALLOW_BGP_R3",
+            "sequence": 10,
+            "action": "permit",
+            "network": "10.0.0.9",
+            "mask": "255.255.255.255"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 12,
+      "remediation_step_idx": 5,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:58:46.286693+00:00",
+      "changes": [
+        {
+          "tool": "create_standard_acl",
+          "args": {
+            "router_name": "router2",
+            "acl_name": "TEMP_ALLOW_BGP_R1",
+            "sequence": 10,
+            "action": "permit",
+            "network": "10.0.0.1",
+            "mask": "255.255.255.255"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 13,
+      "remediation_step_idx": 6,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:59:06.587026+00:00",
+      "changes": [
+        {
+          "tool": "create_standard_acl",
+          "args": {
+            "router_name": "router2",
+            "acl_name": "TEMP_ALLOW_BGP_R3",
+            "sequence": 10,
+            "action": "permit",
+            "network": "10.0.0.6",
+            "mask": "255.255.255.255"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 14,
+      "remediation_step_idx": 7,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:59:21.616686+00:00",
+      "changes": [
+        {
+          "tool": "create_standard_acl",
+          "args": {
+            "router_name": "router3",
+            "acl_name": "TEMP_ALLOW_BGP_R1",
+            "sequence": 10,
+            "action": "permit",
+            "network": "10.0.0.10",
+            "mask": "255.255.255.255"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 15,
+      "remediation_step_idx": 8,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T10:59:42.219039+00:00",
+      "changes": [
+        {
+          "tool": "create_standard_acl",
+          "args": {
+            "router_name": "router3",
+            "acl_name": "TEMP_ALLOW_BGP_R2",
+            "sequence": 10,
+            "action": "permit",
+            "network": "10.0.0.5",
+            "mask": "255.255.255.255"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 16,
+      "remediation_step_idx": 9,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 98.7,
+      "diagnose_s": 37.8,
+      "remediate_s": 332.9,
+      "verify_s": 62.6,
+      "total_s": 814.5
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 4,
+      "get_info": 2,
+      "format_network": 2,
+      "diagnose": 2,
+      "remediation": 16,
+      "collect_changes": 16,
+      "verify": 2,
+      "assess_verify": 2,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 27,
+      "tool_calls_pre_diagnosis": 4,
+      "tool_calls_remediation": 16,
+      "tool_calls_verify": 7,
+      "remediation_attempts": 16,
+      "plan_steps": 9,
+      "diagnoses_created": 2,
+      "plans_created": 2,
+      "execution_updates": 16
+    },
+    "tokens": {
+      "total_prompt_tokens": 304018,
+      "total_completion_tokens": 52210,
+      "total_tokens": 356228
+    }
+  }
+}

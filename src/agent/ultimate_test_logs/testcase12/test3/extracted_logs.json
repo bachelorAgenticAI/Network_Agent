@@ -1,0 +1,377 @@
+{
+  "metadata": {
+    "run_id": "alert-1",
+    "test_case_id": "tc_unknown_configuration_missing_01",
+    "started_at": "2026-05-28T09:25:09.826096+00:00",
+    "ended_at": "2026-05-28T09:34:28.354081+00:00"
+  },
+  "input_alert": {
+    "alert_type": "BGP_Routing",
+    "device": "R3",
+    "protocol": "BGP",
+    "status": "down"
+  },
+  "prediction_history": [
+    {
+      "ts": "2026-05-28T09:26:51.942789+00:00",
+      "detected": true,
+      "issue_type": "missing_configuration_local",
+      "device": "R3",
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "missing_configuration_local",
+          "cause": "r3_has_no_bgp_process_or_neighbor_configuration_present_so_it_cannot_form_any_bgp_adjacency",
+          "confidence": 0.95,
+          "evidence": [
+            "R3 running-config (lc_4722093d...) JSON includes 'ospf' and 'routing' sections and interface configs but contains no 'bgp' / 'router bgp' stanza.",
+            "R3 interfaces and loopback are configured (Serial0/1/0 = 10.0.0.9, Serial0/1/1 = 10.0.0.6, Loopback1 = 203.0.113.1) but there is no BGP configuration referencing them."
+          ]
+        },
+        {
+          "type": "missing_configuration_peers",
+          "cause": "neighbor_routers_r1_and_r2_also_have_no_bgp_process_or_neighbor_configuration_so_there_are_no_configured_peers_for_r3_to_establish_adjacency_with",
+          "confidence": 0.9,
+          "evidence": [
+            "R1 running-config (lc_2abe8c76...) JSON shows OSPF and interface configs but contains no 'bgp' / 'router bgp' stanza.",
+            "R2 running-config (lc_5e743f5f...) JSON shows OSPF and interface configs but contains no 'bgp' / 'router bgp' stanza."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    },
+    {
+      "ts": "2026-05-28T09:30:53.209609+00:00",
+      "detected": true,
+      "issue_type": "configuration_missing",
+      "device": "R3",
+      "interface": null,
+      "root_causes_ranked": [
+        {
+          "type": "configuration_missing",
+          "cause": "no_bgp_process_configured_on_r3",
+          "confidence": 0.9,
+          "evidence": [
+            "R3 running-config JSON contains an OSPF block and Loopback1 but contains no BGP configuration block (no 'bgp' or 'router bgp' entries). Example extracts: \"Loopback\": [{ \"name\": 1, ... \"address\": { \"primary\": { \"address\": \"203.0.113.1\" }}}], and \"ospf\": { \"process-id\": [{ \"id\": 1, ... }] } (no bgp shown)."
+          ]
+        },
+        {
+          "type": "configuration_missing",
+          "cause": "no_bgp_process_configured_on_r1_and_r2_peers",
+          "confidence": 0.9,
+          "evidence": [
+            "R1 running-config JSON shows \"routing\": null and an OSPF process (\"ospf\": { \"process-id\": [{ \"id\": 1, ... }] }) but no BGP configuration block.",
+            "R2 running-config JSON shows \"routing\": null and an OSPF process (\"ospf\": { \"process-id\": [{ \"id\": 1, ... }] }) but no BGP configuration block."
+          ]
+        },
+        {
+          "type": "configuration_missing",
+          "cause": "no_bgp_neighbor_relationships_or_advertisement_of_r3_s_loopback1_configured",
+          "confidence": 0.8,
+          "evidence": [
+            "None of the running-config JSONs for R1, R2, or R3 include BGP neighbor statements or BGP network/redistribute statements to advertise 203.0.113.1. R3 has Loopback1 (\"address\": { \"primary\": { \"address\": \"203.0.113.1\" }}) but no BGP config to advertise it."
+          ]
+        }
+      ],
+      "needs_fix": true,
+      "missing_info": []
+    }
+  ],
+  "plan_history": [
+    {
+      "ts": "2026-05-28T09:27:19.169880+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "BGP adjacency on R3 is down because R3 and its peers (R1, R2) lack any BGP configuration; goal is to create BGP processes and neighbor relationships so R3 forms BGP adjacencies and advertises its Loopback1 (203.0.113.1).",
+      "needs_fix": true,
+      "problem": "R3 has no BGP process or neighbor configuration; R1 and R2 also have no BGP configured. No BGP adjacency can form and Loopback1 (203.0.113.1) is not being advertised via BGP.",
+      "fix_summary": "Create a BGP process on R3, R1, and R2 using ASN 65000 (assumed). Configure neighbors using the directly connected peer IPs on Serial0/1/0 and Serial0/1/1 and advertise 203.0.113.1/32 from R3.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router1",
+          "action": "configure_bgp",
+          "target": "65000",
+          "parameters": [
+            "create BGP process ASN 65000",
+            "add neighbor: use directly-connected peer IP on interface Serial0/1/0 (remote of R1<->R3 link) with remote-as 65000",
+            "no other changes"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router2",
+          "action": "configure_bgp",
+          "target": "65000",
+          "parameters": [
+            "create BGP process ASN 65000",
+            "add neighbor: use directly-connected peer IP on interface Serial0/1/1 (remote of R2<->R3 link) with remote-as 65000",
+            "no other changes"
+          ]
+        },
+        {
+          "id": 3,
+          "device": "router3",
+          "action": "configure_bgp",
+          "target": "65000",
+          "parameters": [
+            "create BGP process ASN 65000",
+            "advertise network 203.0.113.1/32",
+            "add neighbor: use directly-connected peer IP on interface Serial0/1/0 with remote-as 65000",
+            "add neighbor: use directly-connected peer IP on interface Serial0/1/1 with remote-as 65000"
+          ]
+        }
+      ],
+      "step_count": 3
+    },
+    {
+      "ts": "2026-05-28T09:31:42.711488+00:00",
+      "intent": "check_and_fix",
+      "intent_description": "BGP adjacency on R3 is down because R3 and its peers (R1, R2) lack any BGP configuration; goal is to create BGP processes and neighbor relationships so R3 forms BGP adjacencies and advertises its Loopback1 (203.0.113.1).",
+      "needs_fix": true,
+      "problem": "No BGP process or neighbor statements on R1, R2, R3; R3's Loopback1 (203.0.113.1) is not being advertised. R3 also lacks the serial IPs opposite R1 and R2 required to form eBGP adjacencies.",
+      "fix_summary": "Configure missing serial IPs on router3, create BGP processes on router1, router2, and router3 with assumed ASNs, and advertise 203.0.113.1 from R3. Assumptions: router1 AS=65001, router2 AS=65002, router3 AS=65003; R1 Serial0/1/1=10.0.0.10/30, R2 Serial0/1/1=10.0.0.5/30 (from prior changes). Assume R3 uses 10.0.0.9 on Serial0/1/1 (toward R1) and 10.0.0.6 on Serial0/1/2 (toward R2). If actual neighbor IPs or ASNs differ, update neighbor IPs/ASNs accordingly.",
+      "steps": [
+        {
+          "id": 1,
+          "device": "router3",
+          "action": "configure_interface",
+          "target": "Serial0/1/1",
+          "parameters": [
+            "ip=10.0.0.9",
+            "mask=255.255.255.252"
+          ]
+        },
+        {
+          "id": 2,
+          "device": "router3",
+          "action": "configure_interface",
+          "target": "Serial0/1/2",
+          "parameters": [
+            "ip=10.0.0.6",
+            "mask=255.255.255.252"
+          ]
+        },
+        {
+          "id": 3,
+          "device": "router1",
+          "action": "configure_bgp",
+          "target": null,
+          "parameters": [
+            "local_as=65001",
+            "neighbor=10.0.0.9 remote_as=65003"
+          ]
+        },
+        {
+          "id": 4,
+          "device": "router2",
+          "action": "configure_bgp",
+          "target": null,
+          "parameters": [
+            "local_as=65002",
+            "neighbor=10.0.0.6 remote_as=65003"
+          ]
+        },
+        {
+          "id": 5,
+          "device": "router3",
+          "action": "configure_bgp",
+          "target": null,
+          "parameters": [
+            "local_as=65003",
+            "neighbor=10.0.0.10 remote_as=65001",
+            "neighbor=10.0.0.5 remote_as=65002",
+            "advertise=203.0.113.1/32"
+          ]
+        }
+      ],
+      "step_count": 5
+    }
+  ],
+  "execution": {
+    "verify": {
+      "passed": false,
+      "evidence": {},
+      "remaining_issues": [
+        "No BGP process configured on R3 (no 'router bgp' found).",
+        "No BGP process configured on R1 and R2 (peers) — no 'router bgp' found.",
+        "No BGP neighbor relationships or advertisement of R3's Loopback1 (203.0.113.1) configured/present in observed data."
+      ]
+    }
+  },
+  "execution_history": [
+    {
+      "ts": "2026-05-28T09:27:49.022902+00:00",
+      "changes": [
+        {
+          "tool": "configure_interface",
+          "args": {
+            "router_name": "router1",
+            "interface_name": "Serial0/1/1",
+            "ip": "10.0.0.10",
+            "mask": "255.255.255.252"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 1,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T09:28:04.549049+00:00",
+      "changes": [
+        {
+          "tool": "configure_interface",
+          "args": {
+            "router_name": "router2",
+            "interface_name": "Serial0/1/1",
+            "ip": "10.0.0.5",
+            "mask": "255.255.255.252"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 2,
+      "remediation_step_idx": 2,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T09:28:24.347833+00:00",
+      "changes": [
+        {
+          "tool": "configure_interface",
+          "args": {
+            "router_name": "router3",
+            "interface_name": "Loopback1",
+            "ip": "203.0.113.1",
+            "mask": "255.255.255.255"
+          },
+          "result": "success"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 3,
+      "remediation_step_idx": 3,
+      "remediation_done": true
+    },
+    {
+      "ts": "2026-05-28T09:31:58.984164+00:00",
+      "changes": [
+        {
+          "tool": "configure_interface",
+          "args": {
+            "router_name": "router3",
+            "interface_name": "Serial0/1/1",
+            "ip": "10.0.0.9",
+            "mask": "255.255.255.252"
+          },
+          "result": "error"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 4,
+      "remediation_step_idx": 1,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T09:32:13.997488+00:00",
+      "changes": [
+        {
+          "tool": "configure_interface",
+          "args": {
+            "router_name": "router3",
+            "interface_name": "Serial0/1/2",
+            "ip": "10.0.0.6",
+            "mask": "255.255.255.252"
+          },
+          "result": "error"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 5,
+      "remediation_step_idx": 2,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T09:32:30.716367+00:00",
+      "changes": [
+        {
+          "tool": "get_running_config",
+          "args": {
+            "router_name": "router1"
+          },
+          "result": "unknown"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 6,
+      "remediation_step_idx": 3,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T09:32:48.640680+00:00",
+      "changes": [],
+      "change_count": 0,
+      "total_change_count": 7,
+      "remediation_step_idx": 4,
+      "remediation_done": false
+    },
+    {
+      "ts": "2026-05-28T09:33:16.497562+00:00",
+      "changes": [
+        {
+          "tool": "get_running_config",
+          "args": {
+            "router_name": "router3"
+          },
+          "result": "unknown"
+        }
+      ],
+      "change_count": 1,
+      "total_change_count": 8,
+      "remediation_step_idx": 5,
+      "remediation_done": true
+    }
+  ],
+  "metrics_input": {
+    "timings": {
+      "detect_s": 105.7,
+      "diagnose_s": 31.5,
+      "remediate_s": 122.5,
+      "verify_s": 95.7,
+      "total_s": 558.5
+    },
+    "node_cycles": {
+      "monitor_loop": 1,
+      "ingestion": 1,
+      "intent": 4,
+      "get_info": 2,
+      "format_network": 2,
+      "diagnose": 2,
+      "remediation": 8,
+      "collect_changes": 8,
+      "verify": 2,
+      "assess_verify": 2,
+      "summary": 1
+    },
+    "counts": {
+      "tool_calls_total": 16,
+      "tool_calls_pre_diagnosis": 6,
+      "tool_calls_remediation": 8,
+      "tool_calls_verify": 2,
+      "remediation_attempts": 8,
+      "plan_steps": 5,
+      "diagnoses_created": 2,
+      "plans_created": 2,
+      "execution_updates": 8
+    },
+    "tokens": {
+      "total_prompt_tokens": 124038,
+      "total_completion_tokens": 39589,
+      "total_tokens": 163627
+    }
+  }
+}
