@@ -68,6 +68,14 @@ The agent executes the monitoring, diagnosis, remediation, and verification work
 python3 -m agent.agent
 ```
 
+### Run the simple Agent
+
+Run in src/agent/
+
+```bash
+python3 agent-simple.py
+```
+
 ## Monitoring
 
 The monitoring system runs automatically, providing the input that initiates the agentic workflow. It:
