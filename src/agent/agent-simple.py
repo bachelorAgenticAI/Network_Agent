@@ -199,6 +199,10 @@ def _message_to_record(message: Any) -> dict[str, Any]:
     return {"type": type(message).__name__, "content": str(message)}
 
 
+def _message_window(messages: list[Any], limit: int = 6) -> list[dict[str, Any]]:
+    return [_message_to_record(message) for message in messages[-limit:]]
+
+
 def _is_remediation_tool(tool_name: str) -> bool:
     return tool_name.startswith("rem_") or tool_name in {
         "set_interface_state",
@@ -303,15 +307,54 @@ async def single_shot_node(
         ),
     ]
 
-    for _ in range(max_tool_rounds):
-        ai = await llm_with_tools.ainvoke(messages) 
-        messages.append(ai) # Add the AI message to the conversation history before processing tool calls
+    for round_idx in range(max_tool_rounds):
+        log_node_enter(
+            "simple_baseline_llm_round",
+            {
+                "round": round_idx + 1,
+                "max_tool_rounds": max_tool_rounds,
+                "message_count_before": len(messages),
+                "tool_records_so_far": _extract_tool_records(messages),
+                "recent_messages": _message_window(messages),
+            },
+        )
+
+        ai = await llm_with_tools.ainvoke(messages)
+        messages.append(ai)  # Add the AI message before processing tool calls.
         tool_calls = getattr(ai, "tool_calls", None) or []
+
+        log_node_exit(
+            "simple_baseline_llm_round",
+            {
+                "round": round_idx + 1,
+                "message_count_after": len(messages),
+                "ai_message": _message_to_record(ai),
+                "tool_call_count": len(tool_calls),
+            },
+        )
+
         if not tool_calls:
             break
 
         for call in tool_calls:
-            messages.append(await _execute_tool_call(tool_by_name, call))
+            log_node_enter(
+                "simple_baseline_tool_call",
+                {
+                    "round": round_idx + 1,
+                    "call": _jsonable(call),
+                    "message_count_before": len(messages),
+                },
+            )
+            tool_message = await _execute_tool_call(tool_by_name, call)
+            messages.append(tool_message)
+            log_node_exit(
+                "simple_baseline_tool_call",
+                {
+                    "round": round_idx + 1,
+                    "tool_message": _message_to_record(tool_message),
+                    "message_count_after": len(messages),
+                },
+            )
 
     tool_records = _extract_tool_records(messages)
     changes = [record for record in tool_records if record.get("phase") == "remediation"]
