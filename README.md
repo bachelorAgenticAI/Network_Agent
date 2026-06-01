@@ -72,6 +72,8 @@ python3 -m agent.agent
 
 Run in src/agent/
 
+Adjust the memory/custom_alerts.json for alert/prompt
+
 ```bash
 python3 agent-simple.py
 ```

@@ -1,4 +1,11 @@
-"""Single-node baseline agent for manual network troubleshooting experiments."""
+"""
+Single-node baseline for comparison against the multi-node workflow.
+
+The graph invokes one LangGraph node, but that node may run multiple LLM/tool rounds internally.
+Each round appends the AI response and tool results to the same message history, so later LLM calls
+reason over more accumulated evidence than earlier calls.
+"""
+ 
 
 from __future__ import annotations
 
@@ -34,6 +41,7 @@ load_dotenv()
 
 DEFAULT_OUTPUT = Path(__file__).resolve().parent / "logger" / "simple_baseline_result.json"
 DEFAULT_MCP_URL = "http://127.0.0.1:8000/mcp"
+DEFAULT_ALERTS = Path(__file__).resolve().parent / "memory" / "custom_alerts.json"
 
 
 class BaselineToolRecord(BaseModel):
@@ -60,47 +68,50 @@ class BaselineResult(BaseModel):
 
 SYSTEM = """You are a single-node network troubleshooting baseline agent.
 
-You must handle the whole workflow yourself in one pass:
-1. Understand the user's alert/request and classify intent.
-2. Gather enough facts with MCP tools.
-3. Diagnose only issues that are directly relevant to the request and supported by tool evidence.
-4. If the request or diagnosis requires remediation, plan the minimal safe fix.
-5. Execute applicable remediation with the available remediation tools.
-6. Verify with tools after remediation when changes were made, or verify current state for check-only requests when useful.
-7. Produce a structured result for offline analysis.
+You must follow this chain strictly inside this single node:
+1. Understand the injected alert and classify intent.
+2. Gather evidence with MCP tools before diagnosing. Use tool evidence, not guesses.
+3. Form an initial diagnosis from only the pre-remediation evidence. Diagnose only issues directly relevant to the alert.
+4. Create a remediation plan from that initial diagnosis. Do not remediate before you have a diagnosis and plan.
+5. Execute the planned remediation with the available remediation tools when the alert requires repair.
+6. Verify the result with MCP tools after remediation, or verify current state for check-only alerts.
+7. Produce the final structured JSON output only after the understand -> gather -> diagnose -> plan -> remedy -> verify chain is complete.
 
 Tool rules:
 - Use router identifiers like "router1", "router2", etc. Never use hostnames as router arguments.
-- If the user says R1, R2, etc., translate that to router1, router2, etc. in tool calls.
+- If the alert says R1, R2, etc., translate that to router1, router2, etc. in tool calls.
 - Use full interface names such as "GigabitEthernet0/0/1"; do not abbreviate.
-- If the user describes a concrete network problem and asks you to fix it
-  (for example: "traffic from router1 is not routed, can you fix it"), treat that
+- If the alert describes a concrete network problem or failed service, treat that
   as authorization to gather evidence, diagnose, apply the minimal relevant fix,
   and verify the result without asking for confirmation.
-- Read-only tools should be used before remediation unless the user's request is an explicit configuration change with enough target detail.
-- Remediation tools change device state. Use them when the user indicates a problem with the network and asks for a fix.
-- Keep changes minimal and scoped to the user's issue. Do not touch unrelated protocols, interfaces, or devices.
-- After remediation, use verification tools to check whether the original problem is resolved.
+- Read-only tools should be used before remediation unless the alert contains an explicit configuration target with enough detail.
+- Remediation tools change device state. Use them when the alert indicates a concrete network problem that needs repair.
+- Keep changes scoped to the alert. Do not touch unrelated protocols, interfaces, or devices.
+- After remediation, use verification tools to check whether the original alert condition is resolved.
 
 Output rules:
 - During tool-use rounds, call tools or briefly state what you have learned.
-- Do not ask for confirmation inside this baseline. If details are incomplete, make reasonable assumptions from router_mapping, tool evidence, and the user's goal; record uncertainty in missing_info or residual_risk.
+- Do not ask for confirmation inside this baseline. If details are incomplete, make reasonable assumptions from router_mapping, alert fields, and tool evidence; record uncertainty in missing_info or residual_risk.
 - When all needed tool calls are complete, return ONLY one valid JSON object. Do not wrap it in markdown.
 - The final JSON must contain these top-level keys: intent, intent_description, target, diagnosis, needs_fix, plan, changes, verify, final_summary, tool_records, reasoning_trace, residual_risk.
 - target must be a string or null, for example "router1 GigabitEthernet0/0/1"; never an object.
 - diagnosis.root_causes items must contain type, cause, evidence as a list of strings, and confidence.
+- diagnosis must describe the initial alert condition or requested state based on evidence gathered before remediation.
+- Do not put failed remediation attempts, API errors from change tools, or post-remediation verification failures in diagnosis.root_causes.
+- Put remediation execution failures in changes, verify.remaining_issues, residual_risk, and final_summary instead.
+- For explicit configuration alerts, the diagnosis may be "target identified and current state differs from requested state" or "requested change target identified"; it should not become "remediation failed" after the change attempt.
 - plan.plan_steps items must contain id, device, action, target, and parameters.
 - residual_risk must be a list of strings, never a single string.
 - tool_records and changes must use keys phase, tool, args, and result.
-- intent is "check" when the user only asks for investigation/status.
-- intent is "check_and_fix" when the user reports a concrete problem needing repair or asks for configuration/remediation.
+- intent is "check" when the alert only calls for investigation/status.
+- intent is "check_and_fix" when the alert describes a concrete problem needing repair or configuration/remediation.
 - diagnosis.root_causes must be supported by tool evidence.
-- needs_fix is false when no supported problem remains or the user only asked for a check.
+- needs_fix is false when no supported problem remains or the alert only calls for a check.
 - plan.plan_steps must describe only real remediation actions that were executed or should have been executed.
 - changes must include only configuration-changing tool calls.
-- verify.passed is true only when evidence shows the original problem is gone or the requested check is healthy.
+- verify.passed is true only when evidence shows the original alert condition is gone or the check is healthy.
 - If verification is inconclusive, set verify.passed=false and explain missing evidence.
-- final_summary should be short and user-facing.
+- final_summary should be short and alert-focused.
 - reasoning_trace should be concise phase-level notes, not hidden chain-of-thought.
 """
 
@@ -145,11 +156,11 @@ def _extract_json_object(text: Any) -> dict[str, Any]:
     return parsed
 
 
-def _fallback_result(user_input: str, tool_records: list[dict[str, Any]], reason: str) -> dict[str, Any]:
+def _fallback_result(alert_input: str, tool_records: list[dict[str, Any]], reason: str) -> dict[str, Any]:
     changes = [record for record in tool_records if record.get("phase") == "remediation"]
     result = BaselineResult(
         intent="check_and_fix" if changes else "check",
-        intent_description=user_input,
+        intent_description=alert_input,
         target=None,
         needs_fix=False,
         changes=[BaselineToolRecord.model_validate(record) for record in changes],
@@ -257,19 +268,21 @@ async def _execute_tool_call(tool_by_name: dict[str, Any], call: dict[str, Any])
     )
 
 
+# This is the core single-node agent logic. It runs a loop of LLM reasoning and tool calls until the LLM stops calling tools or the max round limit is reached.
+# Each later LLM invocation has more evidence than the previous one
 async def single_shot_node(
     state: AgentState,
     llm_with_tools: Any,
     tools: list[Any],
     max_tool_rounds: int,
 ) -> dict:
-    user_input = (state.get("user_input") or "").strip()
+    alert_input = (state.get("user_input") or "").strip()
     router_mapping = {router_id: router.name for router_id, router in ROUTERS.items()}
     tool_names = [getattr(tool, "name", "") for tool in tools]
     tool_by_name = {getattr(tool, "name", ""): tool for tool in tools}
 
     ctx = {
-        "user_input": user_input,
+        "alert_input": alert_input,
         "router_mapping": router_mapping,
         "available_tools": tool_names,
         "max_tool_rounds": max_tool_rounds,
@@ -281,7 +294,7 @@ async def single_shot_node(
         HumanMessage(
             content=json.dumps(
                 {
-                    "user_input": user_input,
+                    "alert_input": alert_input,
                     "router_mapping": router_mapping,
                     "available_tools": tool_names,
                 },
@@ -291,8 +304,8 @@ async def single_shot_node(
     ]
 
     for _ in range(max_tool_rounds):
-        ai = await llm_with_tools.ainvoke(messages)
-        messages.append(ai)
+        ai = await llm_with_tools.ainvoke(messages) 
+        messages.append(ai) # Add the AI message to the conversation history before processing tool calls
         tool_calls = getattr(ai, "tool_calls", None) or []
         if not tool_calls:
             break
@@ -306,7 +319,7 @@ async def single_shot_node(
     final_ai = messages[-1] if messages and isinstance(messages[-1], AIMessage) else None
     if final_ai is None or (getattr(final_ai, "tool_calls", None) or []):
         result = _fallback_result(
-            user_input,
+            alert_input,
             tool_records,
             "The model used the full tool budget before returning final JSON.",
         )
@@ -315,7 +328,7 @@ async def single_shot_node(
             result = _extract_json_object(final_ai.content)
         except Exception as exc:
             result = _fallback_result(
-                user_input,
+                alert_input,
                 tool_records,
                 f"The model returned invalid final JSON: {exc}",
             )
@@ -366,10 +379,15 @@ async def _load_tools(mcp_url: str) -> list[Any]:
     return await client.get_tools()
 
 
-def _read_prompt(args: argparse.Namespace) -> str:
-    if args.prompt:
-        return args.prompt.strip()
-    return input("Network task: ").strip()
+def _read_alert_input(path: Path) -> str:
+    raw = path.read_text(encoding="utf-8").strip()
+    if not raw:
+        return ""
+
+    try:
+        return json.dumps(json.loads(raw), ensure_ascii=False)
+    except json.JSONDecodeError:
+        return raw
 
 
 def _write_result(path: Path, data: dict[str, Any]) -> None:
@@ -379,16 +397,20 @@ def _write_result(path: Path, data: dict[str, Any]) -> None:
 
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Run the single-node baseline network agent.")
-    parser.add_argument("prompt", nargs="?", help="Manual alert/request to give the baseline agent.")
+    parser.add_argument(
+        "--alerts",
+        default=str(DEFAULT_ALERTS),
+        help="Path to the alert JSON file used as agent input.",
+    )
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT), help="Path for structured JSON output.")
     parser.add_argument("--model", default="gpt-5-mini", help="OpenAI chat model to use.")
     parser.add_argument("--mcp-url", default=DEFAULT_MCP_URL, help="MCP streamable HTTP URL.")
     parser.add_argument("--max-tool-rounds", type=int, default=8, help="Maximum internal tool loops.")
     args = parser.parse_args()
 
-    prompt = _read_prompt(args)
-    if not prompt:
-        print("No prompt provided.")
+    alert_input = _read_alert_input(Path(args.alerts))
+    if not alert_input:
+        print(f"No alert input found in {args.alerts}.")
         return
 
     try:
@@ -405,7 +427,7 @@ async def main() -> None:
     app = build_app(llm_with_tools, tools, args.max_tool_rounds)
 
     state = await app.ainvoke(
-        {"user_input": prompt},
+        {"user_input": alert_input},
         config={"configurable": {"thread_id": f"simple-baseline-{int(datetime.now().timestamp())}"}},
     )
     result = json.loads(state["messages"][-1].content)
@@ -413,6 +435,7 @@ async def main() -> None:
         "mode": "single_node_baseline",
         "model": args.model,
         "mcp_url": args.mcp_url,
+        "alerts_file": str(Path(args.alerts)),
         "max_tool_rounds": args.max_tool_rounds,
         "generated_at": _now_iso(),
     }
