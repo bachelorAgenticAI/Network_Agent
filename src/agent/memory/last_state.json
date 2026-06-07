@@ -1,1 +1,123 @@
-{}
+{
+  "devices": [
+    {
+      "device": "R1",
+      "interfaces": [
+        {
+          "name": "GigabitEthernet0/0/0",
+          "admin_state": "up",
+          "oper_state": "up",
+          "input_errors": 0,
+          "output_errors": 0,
+          "drops": 0
+        },
+        {
+          "name": "GigabitEthernet0/0/1",
+          "admin_state": "up",
+          "oper_state": "up",
+          "input_errors": 127,
+          "output_errors": 0,
+          "drops": 0
+        },
+        {
+          "name": "Serial0/1/0",
+          "admin_state": "down",
+          "oper_state": "down",
+          "input_errors": 0,
+          "output_errors": 0,
+          "drops": 0
+        },
+        {
+          "name": "Serial0/1/1",
+          "admin_state": "up",
+          "oper_state": "up",
+          "input_errors": 0,
+          "output_errors": 0,
+          "drops": 0
+        }
+      ]
+    },
+    {
+      "device": "R2",
+      "interfaces": [
+        {
+          "name": "GigabitEthernet0/0/0",
+          "admin_state": "up",
+          "oper_state": "up",
+          "input_errors": 0,
+          "output_errors": 0,
+          "drops": 0
+        },
+        {
+          "name": "GigabitEthernet0/0/1",
+          "admin_state": "up",
+          "oper_state": "up",
+          "input_errors": 134,
+          "output_errors": 0,
+          "drops": 0
+        },
+        {
+          "name": "Serial0/1/0",
+          "admin_state": "down",
+          "oper_state": "down",
+          "input_errors": 7,
+          "output_errors": 0,
+          "drops": 0
+        },
+        {
+          "name": "Serial0/1/1",
+          "admin_state": "up",
+          "oper_state": "up",
+          "input_errors": 0,
+          "output_errors": 0,
+          "drops": 0
+        }
+      ]
+    },
+    {
+      "device": "R3",
+      "interfaces": [
+        {
+          "name": "GigabitEthernet0/0/0",
+          "admin_state": "down",
+          "oper_state": "down",
+          "input_errors": 0,
+          "output_errors": 0,
+          "drops": 0
+        },
+        {
+          "name": "GigabitEthernet0/0/1",
+          "admin_state": "down",
+          "oper_state": "down",
+          "input_errors": 0,
+          "output_errors": 0,
+          "drops": 0
+        },
+        {
+          "name": "Loopback1",
+          "admin_state": "up",
+          "oper_state": "up",
+          "input_errors": 0,
+          "output_errors": 0,
+          "drops": 0
+        },
+        {
+          "name": "Serial0/1/0",
+          "admin_state": "up",
+          "oper_state": "up",
+          "input_errors": 0,
+          "output_errors": 0,
+          "drops": 0
+        },
+        {
+          "name": "Serial0/1/1",
+          "admin_state": "up",
+          "oper_state": "up",
+          "input_errors": 0,
+          "output_errors": 0,
+          "drops": 0
+        }
+      ]
+    }
+  ]
+}

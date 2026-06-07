@@ -204,11 +204,23 @@ async def set_interface_description(
     }
 
     async with get_client(router) as client:
-        r = await client.patch(
-            f"{base}/data/ietf-interfaces:interfaces/interface={intf}", json=payload
-        )
-        r.raise_for_status()
-        return {"result": f"Description set on {interface_name}"}
+        try:
+            r = await client.patch(
+                f"{base}/data/ietf-interfaces:interfaces/interface={intf}",
+                json=payload,
+            )
+            r.raise_for_status()
+
+            return {
+                "status": "success",
+                "message": f"Description set on {interface_name}",
+            }
+
+        except Exception as e:
+            logging.error(
+                f"Failed to set description on {interface_name} on {router.name}: {e}"
+            )
+            return {"status": "error", "message": str(e)}
 
 
 def rem_interface_tools(mcp):
